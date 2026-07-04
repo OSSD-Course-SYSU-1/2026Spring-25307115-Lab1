@@ -1,0 +1,752 @@
+Ôr@Ÿªassertions¤code´customTransformCache¬dependencies¢id¤meta±moduleSideEffects¬originalCode±originalSourcemap«resolvedIds®sourcemapChainµsyntheticNamedExportsµtransformDependencies®transformFiles¨cacheAstÔrAÚ/‰/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import { PlayMode } from '../common/Constants';
+import { AudioRendererController } from './AudioRendererController';
+import { AVPlayerController } from './AVPlayerController';
+import { Logger } from '../utils/Logger';
+import dataPreferences from '@ohos.data.preferences';
+import { EqualizerController } from '../utils/EqualizerController';
+// [Start PlayerController_methods]
+// [Start PlayerController_avplayer_methods]
+export class PlayerController {
+    constructor() {
+        // [StartExclude PlayerController_methods]
+        // [StartExclude PlayerController_avplayer_methods]
+        this.avPlayerController = undefined;
+        this.audioRendererController = undefined;
+        this.currentType = 0;
+        this.songList = [];
+        this.currentIndex = 0;
+        this.playMode = PlayMode.SINGLE_LOOP;
+        this.playbackSpeed = 1.0;
+        this.eqController = new EqualizerController();
+        // [EndExclude PlayerController_avplayer_methods]
+    }
+    defaultPlay(rawFileDescriptor) {
+        this.rawFileDescriptor = rawFileDescriptor;
+        this.currentType = 1;
+        this.avPlayerController = new AVPlayerController();
+        this.avPlayerController.init(rawFileDescriptor.fd, rawFileDescriptor.offset, rawFileDescriptor.length);
+        this.avPlayerController.setSpeed(this.playbackSpeed);
+        // è®¾ç½®å‡è¡¡å™¨
+        this.avPlayerController.setEqualizer(this.eqController);
+    }
+    // [EndExclude PlayerController_avplayer_methods]
+    // [EndExclude PlayerController_methods]
+    // Modifying the audio format
+    changeType(rawFileDescriptor, audioType) {
+        try {
+            this.rawFileDescriptor = rawFileDescriptor;
+            if (audioType === 1 || audioType === 2) {
+                this.audioRendererController?.pause(); // Pause AudioRenderer playback
+                // Reset AVPlayer playback
+                this.avPlayerController?.reset(this.rawFileDescriptor.fd, this.rawFileDescriptor.offset, this.rawFileDescriptor.length);
+            }
+            else {
+                // [StartExclude PlayerController_avplayer_methods]
+                this.avPlayerController?.pause(); // Pause AVPlayer playback
+                if (this.audioRendererController === undefined) {
+                    this.audioRendererController = new AudioRendererController();
+                }
+                // Create an AudioRenderer instance and listen for audio data writing
+                this.audioRendererController.initAudioRenderer(this.rawFileDescriptor.fd, this.rawFileDescriptor.offset, this.rawFileDescriptor.length).then(() => {
+                    // è®¾ç½®å‡è¡¡å™¨
+                    this.audioRendererController?.setEqualizer(this.eqController);
+                    this.audioRendererController?.start(); // Start AudioRenderer audio render
+                });
+                // [StartExclude PlayerController_avplayer_methods]
+            }
+            this.currentType = audioType;
+        }
+        catch (error) {
+            Logger.error('changeType error!');
+        }
+    }
+    // [StartExclude PlayerController_methods]
+    // [StartExclude PlayerController_avplayer_methods]
+    start() {
+        if (this.isAVPlayer()) {
+            this.avPlayerController?.play();
+        }
+        else {
+            this.audioRendererController?.start();
+        }
+    }
+    stop() {
+        if (this.isAVPlayer()) {
+            this.avPlayerController?.stop();
+        }
+        else {
+            this.audioRendererController?.stop();
+        }
+    }
+    pause() {
+        if (this.isAVPlayer()) {
+            this.avPlayerController?.pause();
+        }
+        else {
+            this.audioRendererController?.pause();
+        }
+    }
+    // [EndExclude PlayerController_avplayer_methods]
+    // [EndExclude PlayerController_methods]
+    // Determine the return value of isAVPlayer() and call the corresponding seek() method
+    seek(currentTime) {
+        if (this.isAVPlayer()) {
+            this.avPlayerController?.seek(currentTime);
+        }
+        else {
+            // [StartExclude PlayerController_avplayer_methods]
+            this.audioRendererController?.seek(currentTime);
+            // [EndExclude PlayerController_avplayer_methods]
+        }
+    }
+    // [StartExclude PlayerController_avplayer_methods]
+    // [StartExclude PlayerController_methods]
+    release() {
+        if (this.avPlayerController) {
+            this.avPlayerController.release();
+        }
+        if (this.audioRendererController) {
+            this.audioRendererController.release();
+        }
+    }
+    // [EndExclude PlayerController_methods]
+    // Determine whether to use AVPlayer for playback
+    isAVPlayer() {
+        return this.currentType === 1 || this.currentType === 2;
+    }
+    // è®¾ç½®æ’­æ”¾åˆ—è¡¨
+    setPlayList(songList, currentIndex) {
+        this.songList = songList;
+        this.currentIndex = currentIndex;
+    }
+    // è·å–å½“å‰æ­Œæ›²ç´¢å¼•
+    getCurrentIndex() {
+        return this.currentIndex;
+    }
+    // åˆ‡æ¢æ­Œæ›²
+    switchSong(index, rawFileDescriptor, audioType) {
+        this.currentIndex = index;
+        this.changeType(rawFileDescriptor, audioType);
+    }
+    // ä¸Šä¸€æ›²
+    previousSong(rawFileDescriptor, audioType) {
+        if (this.songList.length === 0) {
+            return this.currentIndex;
+        }
+        let newIndex;
+        switch (this.playMode) {
+            case PlayMode.RANDOM:
+                newIndex = Math.floor(Math.random() * this.songList.length);
+                break;
+            case PlayMode.LIST_LOOP:
+                newIndex = (this.currentIndex - 1 + this.songList.length) % this.songList.length;
+                break;
+            case PlayMode.SINGLE_LOOP:
+            default:
+                newIndex = this.currentIndex > 0 ? this.currentIndex - 1 : this.songList.length - 1;
+                break;
+        }
+        this.switchSong(newIndex, rawFileDescriptor, audioType);
+        return newIndex;
+    }
+    // ä¸‹ä¸€æ›²
+    nextSong(rawFileDescriptor, audioType) {
+        if (this.songList.length === 0) {
+            return this.currentIndex;
+        }
+        let newIndex;
+        switch (this.playMode) {
+            case PlayMode.RANDOM:
+                newIndex = Math.floor(Math.random() * this.songList.length);
+                break;
+            case PlayMode.LIST_LOOP:
+                newIndex = (this.currentIndex + 1) % this.songList.length;
+                break;
+            case PlayMode.SINGLE_LOOP:
+            default:
+                newIndex = this.currentIndex < this.songList.length - 1 ? this.currentIndex + 1 : 0;
+                break;
+        }
+        this.switchSong(newIndex, rawFileDescriptor, audioType);
+        return newIndex;
+    }
+    // è®¾ç½®æ’­æ”¾æ¨¡å¼
+    setPlayMode(mode) {
+        this.playMode = mode;
+    }
+    // è·å–æ’­æ”¾æ¨¡å¼
+    getPlayMode() {
+        return this.playMode;
+    }
+    // è®¾ç½®æ’­æ”¾é€Ÿåº¦
+    setPlaybackSpeed(speed) {
+        this.playbackSpeed = speed;
+        if (this.isAVPlayer()) {
+            this.avPlayerController?.setSpeed(speed);
+        }
+        else {
+            this.audioRendererController?.setPlaybackSpeed(speed);
+        }
+    }
+    // è·å–æ’­æ”¾é€Ÿåº¦
+    getPlaybackSpeed() {
+        return this.playbackSpeed;
+    }
+    /**
+     * è·å–å‡è¡¡å™¨æ§åˆ¶å™¨
+     */
+    getEqualizer() {
+        return this.eqController;
+    }
+    /**
+     * åº”ç”¨å‡è¡¡å™¨é¢„è®¾
+     */
+    applyEqPreset(preset) {
+        this.eqController.applyPreset(preset);
+        // é€šçŸ¥å½“å‰æ’­æ”¾å™¨åº”ç”¨æ•ˆæœ
+        if (this.isAVPlayer() && this.avPlayerController) {
+            this.avPlayerController.setEqualizer(this.eqController);
+        }
+        else if (this.audioRendererController) {
+            this.audioRendererController.setEqualizer(this.eqController);
+        }
+        Logger.info(`EQ preset applied: ${preset}`);
+    }
+    /**
+     * è®¾ç½®å‡è¡¡å™¨å¯ç”¨çŠ¶æ€
+     */
+    setEqEnabled(enabled) {
+        this.eqController.setEnabled(enabled);
+        // é€šçŸ¥å½“å‰æ’­æ”¾å™¨
+        if (this.isAVPlayer() && this.avPlayerController) {
+            this.avPlayerController.setEqualizer(this.eqController);
+        }
+        else if (this.audioRendererController) {
+            this.audioRendererController.setEqualizer(this.eqController);
+        }
+        Logger.info(`EQ enabled: ${enabled}`);
+    }
+    /**
+     * è®¾ç½®æŸä¸ªé¢‘æ®µå¢ç›Š
+     */
+    setEqBandGain(bandIndex, gainDb) {
+        this.eqController.setBandGain(bandIndex, gainDb);
+        // é€šçŸ¥å½“å‰æ’­æ”¾å™¨
+        if (this.isAVPlayer() && this.avPlayerController) {
+            this.avPlayerController.setEqualizer(this.eqController);
+        }
+        else if (this.audioRendererController) {
+            this.audioRendererController.setEqualizer(this.eqController);
+        }
+    }
+    /**
+     * ä¿å­˜æ’­æ”¾çŠ¶æ€åˆ° preferencesï¼ˆç”¨äºæµè½¬ï¼‰
+     */
+    async savePlayerState(context) {
+        try {
+            const preferences = await dataPreferences.getPreferences(context, 'player_state');
+            // è·å–å½“å‰æ’­æ”¾è¿›åº¦
+            let currentTime = 0;
+            if (this.isAVPlayer() && this.avPlayerController) {
+                currentTime = this.avPlayerController.getCurrentTime();
+            }
+            else if (this.audioRendererController) {
+                currentTime = this.audioRendererController.getCurrentTime();
+            }
+            await preferences.put('isPlaying', false); // æµè½¬æ—¶é»˜è®¤æš‚åœ
+            await preferences.put('currentTime', currentTime);
+            await preferences.put('currentSongIndex', this.currentIndex);
+            await preferences.put('audioType', this.currentType);
+            await preferences.put('playMode', this.playMode);
+            await preferences.put('playbackSpeed', this.playbackSpeed);
+            await preferences.flush();
+            Logger.info(`æ’­æ”¾å™¨çŠ¶æ€å·²ä¿å­˜: time=${currentTime}, song=${this.currentIndex}, type=${this.currentType}`);
+        }
+        catch (error) {
+            Logger.error(`ä¿å­˜æ’­æ”¾å™¨çŠ¶æ€å¤±è´¥: ${error}`);
+        }
+    }
+    /**
+     * ä» preferences æ¢å¤æ’­æ”¾çŠ¶æ€ï¼ˆç”¨äºæµè½¬ï¼‰
+     */
+    async restorePlayerState(context) {
+        try {
+            const preferences = await dataPreferences.getPreferences(context, 'player_state');
+            const currentTime = await preferences.get('currentTime', 0);
+            const currentSongIndex = await preferences.get('currentSongIndex', 0);
+            const audioType = await preferences.get('audioType', 1);
+            const playMode = await preferences.get('playMode', 0);
+            const playbackSpeed = await preferences.get('playbackSpeed', 1.0);
+            this.currentIndex = currentSongIndex;
+            this.currentType = audioType;
+            this.playMode = playMode;
+            this.playbackSpeed = playbackSpeed;
+            Logger.info(`æ’­æ”¾å™¨çŠ¶æ€å·²æ¢å¤: time=${currentTime}, song=${currentSongIndex}, type=${audioType}`);
+            // è¿”å›éœ€è¦è·³è½¬çš„æ—¶é—´ç‚¹
+            return currentTime;
+        }
+        catch (error) {
+            Logger.error(`æ¢å¤æ’­æ”¾å™¨çŠ¶æ€å¤±è´¥: ${error}`);
+            return 0;
+        }
+    }
+}
+//# sourceMappingURL=PlayerController.js.mapÂ–Ù`D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\common\Constants.etsÙnD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\player\AudioRendererController.etsÙiD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\player\AVPlayerController.etsÙ\D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\utils\Logger.etsÙ[ hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.data.preferences.d.tsÙiD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\utils\EqualizerController.etsÙgD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\player\PlayerController.etsÔrB›ªmoduleName±isLocalDependency¯isNodeEntryFile§pkgPath±belongProjectPath§pkgNameªpkgVersion±dependencyPkgInfo¯hostModulesInfo°belongModulePath¬shouldEmitJs¥entryÃÂÙ>D:\audio-format-switch-master\audio-format-switch-master\entryÙ8D:\audio-format-switch-master\audio-format-switch-master¥entry¥1.0.0Ô  ’ÔrC’²hostDependencyName®hostModuleNameº../player/PlayerController¥entryCº../player/PlayerController¥entryÙ>D:\audio-format-switch-master\audio-format-switch-master\entryÃÃÚ-M/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { AudioType, PlayMode } from '../common/Constants';
+import { AudioRendererController } from './AudioRendererController';
+import { AVPlayerController } from './AVPlayerController';
+import { resourceManager } from '@kit.LocalizationKit';
+import { Logger } from '../utils/Logger';
+import { SongData } from '../model/SongData';
+import dataPreferences from '@ohos.data.preferences';
+import { EqualizerController, EqPresetName, EqBand } from '../utils/EqualizerController';
+// [Start PlayerController_methods]
+// [Start PlayerController_avplayer_methods]
+export class PlayerController {
+  // [StartExclude PlayerController_methods]
+  // [StartExclude PlayerController_avplayer_methods]
+  private avPlayerController: AVPlayerController | undefined = undefined;
+  private audioRendererController: AudioRendererController | undefined = undefined;
+  private currentType: AudioType = 0;
+  private rawFileDescriptor?: resourceManager.RawFileDescriptor;
+  private songList: SongData[] = [];
+  private currentIndex: number = 0;
+  private playMode: PlayMode = PlayMode.SINGLE_LOOP;
+  private playbackSpeed: number = 1.0;
+  private eqController: EqualizerController = new EqualizerController();
+
+  defaultPlay(rawFileDescriptor: resourceManager.RawFileDescriptor) {
+    this.rawFileDescriptor = rawFileDescriptor;
+    this.currentType = 1;
+    this.avPlayerController = new AVPlayerController();
+    this.avPlayerController.init(rawFileDescriptor.fd, rawFileDescriptor.offset, rawFileDescriptor.length);
+    this.avPlayerController.setSpeed(this.playbackSpeed);
+    // è®¾ç½®å‡è¡¡å™¨
+    this.avPlayerController.setEqualizer(this.eqController);
+  }
+  // [EndExclude PlayerController_avplayer_methods]
+  // [EndExclude PlayerController_methods]
+  // Modifying the audio format
+  changeType(rawFileDescriptor: resourceManager.RawFileDescriptor, audioType: AudioType) {
+    try {
+      this.rawFileDescriptor = rawFileDescriptor;
+      if (audioType === 1 || audioType === 2) {
+        this.audioRendererController?.pause(); // Pause AudioRenderer playback
+        // Reset AVPlayer playback
+        this.avPlayerController?.reset(this.rawFileDescriptor.fd, this.rawFileDescriptor.offset,
+          this.rawFileDescriptor.length);
+      } else {
+        // [StartExclude PlayerController_avplayer_methods]
+        this.avPlayerController?.pause(); // Pause AVPlayer playback
+        if (this.audioRendererController === undefined) {
+          this.audioRendererController = new AudioRendererController();
+        }
+        // Create an AudioRenderer instance and listen for audio data writing
+        this.audioRendererController.initAudioRenderer(this.rawFileDescriptor.fd, this.rawFileDescriptor.offset,
+          this.rawFileDescriptor.length).then(() => {
+          // è®¾ç½®å‡è¡¡å™¨
+          this.audioRendererController?.setEqualizer(this.eqController);
+          this.audioRendererController?.start(); // Start AudioRenderer audio render
+        });
+        // [StartExclude PlayerController_avplayer_methods]
+      }
+      this.currentType = audioType;
+    } catch (error) {
+      Logger.error('changeType error!');
+    }
+  }
+  // [StartExclude PlayerController_methods]
+  // [StartExclude PlayerController_avplayer_methods]
+  start(): void {
+    if (this.isAVPlayer()) {
+      this.avPlayerController?.play();
+    } else {
+      this.audioRendererController?.start();
+    }
+  }
+
+  stop(): void {
+    if (this.isAVPlayer()) {
+      this.avPlayerController?.stop();
+    } else {
+      this.audioRendererController?.stop();
+    }
+  }
+
+  pause(): void {
+    if (this.isAVPlayer()) {
+      this.avPlayerController?.pause();
+    } else {
+      this.audioRendererController?.pause();
+    }
+  }
+  // [EndExclude PlayerController_avplayer_methods]
+  // [EndExclude PlayerController_methods]
+  // Determine the return value of isAVPlayer() and call the corresponding seek() method
+  seek(currentTime: number): void {
+    if (this.isAVPlayer()) {
+      this.avPlayerController?.seek(currentTime);
+    } else {
+      // [StartExclude PlayerController_avplayer_methods]
+      this.audioRendererController?.seek(currentTime);
+      // [EndExclude PlayerController_avplayer_methods]
+    }
+  }
+  // [StartExclude PlayerController_avplayer_methods]
+  // [StartExclude PlayerController_methods]
+  release() {
+    if (this.avPlayerController) {
+      this.avPlayerController.release();
+    }
+    if (this.audioRendererController) {
+      this.audioRendererController.release();
+    }
+  }
+  // [EndExclude PlayerController_methods]
+  // Determine whether to use AVPlayer for playback
+  isAVPlayer(): boolean {
+    return this.currentType === 1 || this.currentType === 2;
+  }
+
+  // è®¾ç½®æ’­æ”¾åˆ—è¡¨
+  setPlayList(songList: SongData[], currentIndex: number): void {
+    this.songList = songList;
+    this.currentIndex = currentIndex;
+  }
+
+  // è·å–å½“å‰æ­Œæ›²ç´¢å¼•
+  getCurrentIndex(): number {
+    return this.currentIndex;
+  }
+
+  // åˆ‡æ¢æ­Œæ›²
+  switchSong(index: number, rawFileDescriptor: resourceManager.RawFileDescriptor, audioType: AudioType): void {
+    this.currentIndex = index;
+    this.changeType(rawFileDescriptor, audioType);
+  }
+
+  // ä¸Šä¸€æ›²
+  previousSong(rawFileDescriptor: resourceManager.RawFileDescriptor, audioType: AudioType): number {
+    if (this.songList.length === 0) {
+      return this.currentIndex;
+    }
+
+    let newIndex: number;
+    switch (this.playMode) {
+      case PlayMode.RANDOM:
+        newIndex = Math.floor(Math.random() * this.songList.length);
+        break;
+      case PlayMode.LIST_LOOP:
+        newIndex = (this.currentIndex - 1 + this.songList.length) % this.songList.length;
+        break;
+      case PlayMode.SINGLE_LOOP:
+      default:
+        newIndex = this.currentIndex > 0 ? this.currentIndex - 1 : this.songList.length - 1;
+        break;
+    }
+
+    this.switchSong(newIndex, rawFileDescriptor, audioType);
+    return newIndex;
+  }
+
+  // ä¸‹ä¸€æ›²
+  nextSong(rawFileDescriptor: resourceManager.RawFileDescriptor, audioType: AudioType): number {
+    if (this.songList.length === 0) {
+      return this.currentIndex;
+    }
+
+    let newIndex: number;
+    switch (this.playMode) {
+      case PlayMode.RANDOM:
+        newIndex = Math.floor(Math.random() * this.songList.length);
+        break;
+      case PlayMode.LIST_LOOP:
+        newIndex = (this.currentIndex + 1) % this.songList.length;
+        break;
+      case PlayMode.SINGLE_LOOP:
+      default:
+        newIndex = this.currentIndex < this.songList.length - 1 ? this.currentIndex + 1 : 0;
+        break;
+    }
+
+    this.switchSong(newIndex, rawFileDescriptor, audioType);
+    return newIndex;
+  }
+
+  // è®¾ç½®æ’­æ”¾æ¨¡å¼
+  setPlayMode(mode: PlayMode): void {
+    this.playMode = mode;
+  }
+
+  // è·å–æ’­æ”¾æ¨¡å¼
+  getPlayMode(): PlayMode {
+    return this.playMode;
+  }
+
+  // è®¾ç½®æ’­æ”¾é€Ÿåº¦
+  setPlaybackSpeed(speed: number): void {
+    this.playbackSpeed = speed;
+    if (this.isAVPlayer()) {
+      this.avPlayerController?.setSpeed(speed);
+    } else {
+      this.audioRendererController?.setPlaybackSpeed(speed);
+    }
+  }
+
+  // è·å–æ’­æ”¾é€Ÿåº¦
+  getPlaybackSpeed(): number {
+    return this.playbackSpeed;
+  }
+
+  /**
+   * è·å–å‡è¡¡å™¨æ§åˆ¶å™¨
+   */
+  getEqualizer(): EqualizerController {
+    return this.eqController;
+  }
+
+  /**
+   * åº”ç”¨å‡è¡¡å™¨é¢„è®¾
+   */
+  applyEqPreset(preset: EqPresetName): void {
+    this.eqController.applyPreset(preset);
+    // é€šçŸ¥å½“å‰æ’­æ”¾å™¨åº”ç”¨æ•ˆæœ
+    if (this.isAVPlayer() && this.avPlayerController) {
+      this.avPlayerController.setEqualizer(this.eqController);
+    } else if (this.audioRendererController) {
+      this.audioRendererController.setEqualizer(this.eqController);
+    }
+    Logger.info(`EQ preset applied: ${preset}`);
+  }
+
+  /**
+   * è®¾ç½®å‡è¡¡å™¨å¯ç”¨çŠ¶æ€
+   */
+  setEqEnabled(enabled: boolean): void {
+    this.eqController.setEnabled(enabled);
+    // é€šçŸ¥å½“å‰æ’­æ”¾å™¨
+    if (this.isAVPlayer() && this.avPlayerController) {
+      this.avPlayerController.setEqualizer(this.eqController);
+    } else if (this.audioRendererController) {
+      this.audioRendererController.setEqualizer(this.eqController);
+    }
+    Logger.info(`EQ enabled: ${enabled}`);
+  }
+
+  /**
+   * è®¾ç½®æŸä¸ªé¢‘æ®µå¢ç›Š
+   */
+  setEqBandGain(bandIndex: number, gainDb: number): void {
+    this.eqController.setBandGain(bandIndex, gainDb);
+    // é€šçŸ¥å½“å‰æ’­æ”¾å™¨
+    if (this.isAVPlayer() && this.avPlayerController) {
+      this.avPlayerController.setEqualizer(this.eqController);
+    } else if (this.audioRendererController) {
+      this.audioRendererController.setEqualizer(this.eqController);
+    }
+  }
+
+  /**
+   * ä¿å­˜æ’­æ”¾çŠ¶æ€åˆ° preferencesï¼ˆç”¨äºæµè½¬ï¼‰
+   */
+  async savePlayerState(context: Context): Promise<void> {
+    try {
+      const preferences = await dataPreferences.getPreferences(context, 'player_state');
+      
+      // è·å–å½“å‰æ’­æ”¾è¿›åº¦
+      let currentTime = 0;
+      if (this.isAVPlayer() && this.avPlayerController) {
+        currentTime = this.avPlayerController.getCurrentTime();
+      } else if (this.audioRendererController) {
+        currentTime = this.audioRendererController.getCurrentTime();
+      }
+      
+      await preferences.put('isPlaying', false); // æµè½¬æ—¶é»˜è®¤æš‚åœ
+      await preferences.put('currentTime', currentTime);
+      await preferences.put('currentSongIndex', this.currentIndex);
+      await preferences.put('audioType', this.currentType);
+      await preferences.put('playMode', this.playMode);
+      await preferences.put('playbackSpeed', this.playbackSpeed);
+      await preferences.flush();
+      
+      Logger.info(`æ’­æ”¾å™¨çŠ¶æ€å·²ä¿å­˜: time=${currentTime}, song=${this.currentIndex}, type=${this.currentType}`);
+    } catch (error) {
+      Logger.error(`ä¿å­˜æ’­æ”¾å™¨çŠ¶æ€å¤±è´¥: ${error}`);
+    }
+  }
+
+  /**
+   * ä» preferences æ¢å¤æ’­æ”¾çŠ¶æ€ï¼ˆç”¨äºæµè½¬ï¼‰
+   */
+  async restorePlayerState(context: Context): Promise<number> {
+    try {
+      const preferences = await dataPreferences.getPreferences(context, 'player_state');
+      
+      const currentTime = await preferences.get('currentTime', 0) as number;
+      const currentSongIndex = await preferences.get('currentSongIndex', 0) as number;
+      const audioType = await preferences.get('audioType', 1) as number;
+      const playMode = await preferences.get('playMode', 0) as number;
+      const playbackSpeed = await preferences.get('playbackSpeed', 1.0) as number;
+      
+      this.currentIndex = currentSongIndex;
+      this.currentType = audioType;
+      this.playMode = playMode;
+      this.playbackSpeed = playbackSpeed;
+      
+      Logger.info(`æ’­æ”¾å™¨çŠ¶æ€å·²æ¢å¤: time=${currentTime}, song=${currentSongIndex}, type=${audioType}`);
+      
+      // è¿”å›éœ€è¦è·³è½¬çš„æ—¶é—´ç‚¹
+      return currentTime;
+    } catch (error) {
+      Logger.error(`æ¢å¤æ’­æ”¾å™¨çŠ¶æ€å¤±è´¥: ${error}`);
+      return 0;
+    }
+  }
+  // [EndExclude PlayerController_avplayer_methods]
+}
+// [End PlayerController_avplayer_methods]
+// [End PlayerController_methods]ÀÔrD–¶@ohos.data.preferences³../common/Constants¯../utils/Logger´./AVPlayerController¹./AudioRendererController¼../utils/EqualizerControllerÔrE—ªassertions¨external¢id¤meta±moduleSideEffectsªresolvedByµsyntheticNamedExportsAÃÙ[ hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.data.preferences.d.tsAÃªoh-resolveÂEAÂÙ`D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\common\Constants.etsAÃªoh-resolveÂEAÂÙ\D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\utils\Logger.etsAÃªoh-resolveÂEAÂÙiD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\player\AVPlayerController.etsAÃªoh-resolveÂEAÂÙnD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\player\AudioRendererController.etsAÃªoh-resolveÂEAÂÙiD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\utils\EqualizerController.etsAÃªoh-resolveÂ“ÔrF–§version¤fileªsourceRoot§sources¥names¨mappings³PlayerController.js ‘´PlayerController.etsÜ3‘”    ‘” ˜”   ” ”	 ” ” ” $”. 9”/ :˜”   ” ”	 	”   ”" "”( (”ÌC ÌC”ÌD ÌD˜”   ” ”	 	” ” ”# #”9 9”: :˜”   ” ”	 	” ” ” ”( (”) )–”   ” ” ” ”4 4”5 5˜”   ” ”	 	” ” 4”$ :”ÌB ÌX”ÌC ÌY’”   ”# #’”   ”, ,””   ” ” ” ‘”  ’” ”2 ,’” ”; 5•” 
+” ”" ?”+ ÌH”, ÌI•” 
+”$ !”' ÌI”0 ÌR”1 ÌS•” 
+” ” #” $” %•”  
+”  ”  !”  #”  $•” !
+” !” !!” !"” !#—” "
+” "” "”  "'”! "(”, "3”- "4•” #
+” #” #"”  #%”! #&—” $
+” $” $.”  $2”3 $ÌE”5 $ÌG”6 $ÌH’” ÍE”9 ÍE3’” ÍF ” ÍF”” &” &” &”! &ÌB—” '” '” '	” '”! '”2 '.”3 '/—” (” (” (	” (” (” (” (™” )” )” )	” )”" )”& )"”8 )4”: )6”; )7Ü ” *” *” *	” *”  *”$ * ”% *!”6 *2”7 *3”9 *5”; *7”ÌL *ÌH”ÌM *ÌI”ÌS *ÌO”ÌU *ÌQ”Ìf *Ìb”Ìg *Ìc”Ìm *Ìi”Ìn *Ìj”Ìo *Ìkœ” +” +” +	” +”  +”( +$”) +%”- +)”. +*”; +7”< +8”= +9’” ,” ,œ” -” -” -	” -”  -”, -(”- -)”1 --”2 -.”> -:”? -;”Ì@ -<’” .” .’” /”5 /3’” 0”, 0*’” 1”! 1–” 2” 2” 2”  2ÌA”" 2ÌC”+ 2ÌW’” 3” 3—” 4” 4
+” 4”" 4”% 4”6 40”7 41š” 5” 5
+” 5” 5” 5”# 5”, 5&”1 5+”2 5,”4 5.š” 6” 6” 6”, 6$”. 6&”3 6+”5 6-”6 6.”7 6/”ÌV 6ÌN’” 7”* 7"Ü ” 8” 8” 8”' 8”) 8!”. 8&”/ 8'”3 8+”4 8,”ÌE 8=”ÌF 8>”ÌH 8Ì@”ÌJ 8ÌB”ÌN 8ÌF”ÌO 8ÌG”Ì` 8ÌX”Ìa 8ÌY”Ìg 8Ì_”Ìi 9
+”Ìm 9”Ìn 9”Ì 9 ”Ì€ 9!”Ì† 9'”Ì‡ 9(”Ìˆ 9)‘” :‘” :’” ;”ÌC ;;š” <” <” <”' <”) <!”. <&”0 <(”1 <)”2 <*”ÌL <ÌD˜” =” =” =” =”0 =(”5 =-”> =6”Ì@ =8™” >
+” >” >”0 >&”3 >)”7 >-”ÌN >ÌD”ÌP >ÌF”ÌQ >ÌG‘” ?	’” Ì@”ÌU Ì@ÌMÜ ” ÌA” ÌA” ÌA”, ÌA$”- ÌA%”> ÌA6”? ÌA7”ÌC ÌA;”ÌD ÌA<”ÌU ÌAÌM”ÌV ÌAÌN”ÌX ÌAÌP”ÌZ ÌAÌR”Ì^ ÌAÌV”Ì_ ÌAÌW”Ìp ÌAÌh”Ìq ÌAÌi”Ìw ÌAÌo”Ìy ÌB
+”Ì} ÌB”Ì~ ÌB”Ì ÌB ”Ì ÌB!”Ì– ÌB'”Ì— ÌB(”Ì˜ ÌB)”Ìœ ÌB-”Ì ÌB.”Ì  ÌB1”Ì¢ ÌB3’” ÌC
+” ÌCœ” ÌD
+” ÌD” ÌD”0 ÌD&”2 ÌD(”> ÌD4”? ÌD5”ÌC ÌD9”ÌD ÌD:”ÌP ÌDÌF”ÌQ ÌDÌG”ÌR ÌDÌHš” ÌE
+” ÌE” ÌE”0 ÌE&”2 ÌE(”7 ÌE-”9 ÌE/”: ÌE0”; ÌE1”Ì^ ÌEÌT”” ÌF” ÌF	” ÌF
+” ÌF’” ÌG”ÌC ÌG;‘” ÌH—” ÌI” ÌI
+” ÌI” ÌI” ÌI”( ÌI"”) ÌI#‘”	 ÌJ”” ÌJ” ÌJ” ÌJ” ÌJ˜” ÌK” ÌK” ÌK” ÌK” ÌK”, ÌK&”- ÌK'”. ÌK(‘”	 ÌL’” ÌM” ÌM’” ÌN”. ÌN,’” ÌO”7 ÌO5’” ÌP”	 ÌP—” ÌQ” ÌQ” ÌQ” ÌQ” ÌQ” ÌQ” ÌQ˜” ÌR” ÌR
+” ÌR”# ÌR”% ÌR”) ÌR#”+ ÌR%”, ÌR&‘”	 ÌS‘” ÌS˜” ÌT” ÌT
+” ÌT”( ÌT"”* ÌT$”/ ÌT)”1 ÌT+”2 ÌT,‘”	 ÌU’” ÌV” ÌV’” ÌX” ÌX—” ÌY” ÌY” ÌY” ÌY” ÌY” ÌY” ÌY˜” ÌZ” ÌZ
+” ÌZ”# ÌZ”% ÌZ”) ÌZ#”+ ÌZ%”, ÌZ&‘”	 Ì[‘” Ì[˜” Ì\” Ì\
+” Ì\”( Ì\"”* Ì\$”. Ì\(”0 Ì\*”1 Ì\+‘”	 Ì]’” Ì^” Ì^’” Ì`”	 Ì`—” Ìa” Ìa” Ìa” Ìa” Ìa” Ìa” Ìa˜” Ìb” Ìb
+” Ìb”# Ìb”% Ìb”* Ìb$”, Ìb&”- Ìb'‘”	 Ìc‘” Ìc˜” Ìd” Ìd
+” Ìd”( Ìd"”* Ìd$”/ Ìd)”1 Ìd+”2 Ìd,‘”	 Ìe’” Ìf” Ìf’” Ìg”5 Ìg3’” Ìh”, Ìh*’” Ìi”ÌZ ÌiÌX”” Ìj” Ìj”	 Ìj” Ìj—” Ìk” Ìk” Ìk” Ìk” Ìk” Ìk” Ìkš” Ìl” Ìl
+” Ìl”# Ìl”% Ìl”) Ìl#”* Ìl$”5 Ìl/”6 Ìl0”7 Ìl1‘”	 Ìm‘” Ìm’” Ìn”? Ìn9š” Ìo” Ìo
+” Ìo”( Ìo"”* Ìo$”. Ìo(”/ Ìo)”: Ìo4”; Ìo5”< Ìo6’” Ìp”= Ìp7‘”	 Ìq’” Ìr” Ìr’” Ìs”7 Ìs5’” Ìt”. Ìt,’” Ìu” Ìu	–” Ìv” Ìv” Ìv” Ìv”# Ìv”% Ìv!˜” Ìw” Ìw
+” Ìw”# Ìw”$ Ìw”+ Ìw%”- Ìw'”. Ìw(‘”	 Ìx–” Ìy” Ìy” Ìy” Ìy”( Ìy$”* Ìy&˜” Ìz” Ìz
+” Ìz”( Ìz"”) Ìz#”0 Ìz*”2 Ìz,”3 Ìz-‘”	 Ì{’” Ì|” Ì|’” Ì}”, Ì}*’” Ì~”5 Ì~3’” Ì” Ì” Ì€” Ì€” Ì€” Ì€” Ì€”$ Ì€ ”% Ì€!”) Ì€%”- Ì€)”. Ì€*”9 Ì€5”> Ì€:”? Ì€;”Ì@ Ì€<’” Ì” Ì’” Ìƒ” Ìƒ–” Ì„” Ì„” Ì„” Ì„"” Ì„$”& Ì„8—” Ì…” Ì…” Ì…	” Ì…” Ì…”  Ì…”! Ì…—” Ì†” Ì†” Ì†	” Ì†” Ì†”( Ì†$”) Ì†%’” Ì‡” Ì‡’” Ì‰” Ì‰’” ÌŠ” ÌŠ–” Ì‹” Ì‹” Ì‹” Ì‹”  Ì‹”! Ì‹’” ÌŒ” ÌŒ’” Ì” Ì	˜” Ì” Ì” Ì” Ì” Ì”' ÌÌP”) ÌÌR”2 ÌÌf—” Ì” Ì” Ì	” Ì” Ì”! Ì”" Ìš” Ì‘” Ì‘” Ì‘	” Ì‘” Ì‘”) Ì‘%”+ Ì‘'”4 Ì‘0”5 Ì‘1”6 Ì‘2’” Ì’” Ì’’” Ì””
+ Ì”–” Ì•” Ì•” Ì•”" Ì•ÌC”$ Ì•ÌE”- Ì•ÌYš” Ì–” Ì–” Ì–” Ì–” Ì–” Ì–”  Ì–”% Ì–!”& Ì–"”( Ì–$–” Ì—” Ì—” Ì—” Ì—”$ Ì—”% Ì—‘”	 Ì˜”” Ìš” Ìš” Ìš” Ìš–” Ì›” Ì›” Ì›” Ì›” Ì›” Ì›•” Ìœ” Ìœ” Ìœ” Ìœ”  ÌœÜ ” Ì” Ì” Ì” Ì”  Ì”% Ì”& Ì”* Ì"”+ Ì#”1 Ì)”3 Ì+”6 Ì.”: Ì2”; Ì3”ÌC Ì;”ÌD Ì<”ÌJ ÌÌB”ÌK ÌÌC”ÌL ÌÌD’” Ì” Ì•” ÌŸ” ÌŸ” ÌŸ” ÌŸ”# ÌŸÜ ” Ì ” Ì ” Ì ” Ì ”  Ì ”! Ì ”- Ì %”0 Ì (”1 Ì )”4 Ì ,”8 Ì 0”9 Ì 1”ÌA Ì 9”ÌB Ì :”ÌH Ì Ì@”ÌI Ì ÌA”ÌL Ì ÌD”ÌP Ì ÌH”ÌQ Ì ÌI”ÌY Ì ÌQ”ÌZ Ì ÌR”Ì` Ì ÌX”Ìa Ì ÌY’” Ì¡” Ì¡–” Ì¢” Ì¢” Ì¢” Ì¢”% Ì¢”& Ì¢ ‘” Ì£Ü ” Ì¤” Ì¤” Ì¤” Ì¤”  Ì¤”, Ì¤$”/ Ì¤'”0 Ì¤(”1 Ì¤)”2 Ì¤*”3 Ì¤+”7 Ì¤/”8 Ì¤0”ÌD Ì¤<”ÌG Ì¤?”ÌH Ì¤Ì@”ÌI Ì¤ÌA”ÌJ Ì¤ÌB”ÌK Ì¤ÌC”ÌO Ì¤ÌG”ÌP Ì¤ÌH”ÌX Ì¤ÌP”ÌY Ì¤ÌQ”Ì_ Ì¤ÌW”Ìb Ì¤ÌZ”Ìc Ì¤Ì[”Ìd Ì¤Ì\’” Ì¥” Ì¥‘”	 Ì¦œ” Ì¨” Ì¨” Ì¨	” Ì¨” Ì¨”  Ì¨”" Ì¨”3 Ì¨/”5 Ì¨1”> Ì¨:”? Ì¨;”Ì@ Ì¨<”” Ì©” Ì©” Ì©” Ì©’” Ìª” Ìª’” Ì¬”
+ Ì¬–” Ì­” Ì­
+” Ì­” Ì­?”  Ì­ÌA”) Ì­ÌUš” Ì®” Ì®” Ì®” Ì®” Ì®” Ì®”  Ì®”% Ì®!”& Ì®"”( Ì®$–” Ì¯” Ì¯” Ì¯” Ì¯”$ Ì¯”% Ì¯‘”	 Ì°”” Ì²” Ì²” Ì²” Ì²–” Ì³” Ì³” Ì³” Ì³” Ì³” Ì³•” Ì´” Ì´” Ì´” Ì´”  Ì´Ü ” Ìµ” Ìµ” Ìµ” Ìµ”  Ìµ”% Ìµ”& Ìµ”* Ìµ"”+ Ìµ#”1 Ìµ)”3 Ìµ+”6 Ìµ.”: Ìµ2”; Ìµ3”ÌC Ìµ;”ÌD Ìµ<”ÌJ ÌµÌB”ÌK ÌµÌC”ÌL ÌµÌD’” Ì¶” Ì¶•” Ì·” Ì·” Ì·” Ì·”# Ì·Ü ” Ì¸” Ì¸” Ì¸” Ì¸”  Ì¸”! Ì¸”- Ì¸%”0 Ì¸(”1 Ì¸)”2 Ì¸*”5 Ì¸-”9 Ì¸1”: Ì¸2”ÌB Ì¸:”ÌC Ì¸;”ÌI Ì¸ÌA”ÌJ Ì¸ÌB’” Ì¹” Ì¹–” Ìº” Ìº” Ìº” Ìº”% Ìº”& Ìº ‘” Ì»Ü ” Ì¼” Ì¼” Ì¼” Ì¼”  Ì¼”, Ì¼$”/ Ì¼'”3 Ì¼+”4 Ì¼,”< Ì¼4”= Ì¼5”ÌC Ì¼;”ÌF Ì¼>”ÌG Ì¼?”ÌH Ì¼Ì@”ÌI Ì¼ÌA”ÌJ Ì¼ÌB”ÌN Ì¼ÌF”ÌO Ì¼ÌG”Ì[ Ì¼ÌS”Ì^ Ì¼ÌV”Ì_ Ì¼ÌW”Ì` Ì¼ÌX”Ìa Ì¼ÌY”Ìb Ì¼ÌZ”Ìc Ì¼Ì[”Ìd Ì¼Ì\’” Ì½” Ì½‘”	 Ì¾œ” ÌÀ” ÌÀ” ÌÀ	” ÌÀ” ÌÀ”  ÌÀ”" ÌÀ”3 ÌÀ/”5 ÌÀ1”> ÌÀ:”? ÌÀ;”Ì@ ÌÀ<”” ÌÁ” ÌÁ” ÌÁ” ÌÁ’” ÌÂ” ÌÂ’” ÌÄ” ÌÄ”” ÌÅ” ÌÅ” ÌÅ” ÌÅ—” ÌÆ” ÌÆ” ÌÆ	” ÌÆ” ÌÆ” ÌÆ” ÌÆ’” ÌÇ” ÌÇ’” ÌÉ” ÌÉ’” ÌÊ” ÌÊ–” ÌË” ÌË” ÌË” ÌË” ÌË” ÌË’” ÌÌ” ÌÌ’” ÌÎ” ÌÎ”” ÌÏ” ÌÏ” ÌÏ” ÌÏ —” ÌĞ” ÌĞ” ÌĞ	” ÌĞ” ÌĞ”" ÌĞ”# ÌĞ—” ÌÑ” ÌÑ” ÌÑ” ÌÑ” ÌÑ” ÌÑ” ÌÑš” ÌÒ” ÌÒ
+” ÌÒ”# ÌÒ”% ÌÒ”- ÌÒ'”. ÌÒ(”3 ÌÒ-”4 ÌÒ.”5 ÌÒ/‘”	 ÌÓ‘” ÌÓš” ÌÔ” ÌÔ
+” ÌÔ”( ÌÔ"”* ÌÔ$”: ÌÔ4”; ÌÔ5”Ì@ ÌÔ:”ÌA ÌÔ;”ÌB ÌÔ<‘”	 ÌÕ’” ÌÖ” ÌÖ’” ÌØ” ÌØ’” ÌÙ” ÌÙ–” ÌÚ” ÌÚ” ÌÚ” ÌÚ”! ÌÚ”" ÌÚ’” ÌÛ” ÌÛ‘” Ìİ‘” Ìß’” Ìà” Ìà–” Ìá” Ìá” Ìá” Ìá”  Ìá”! Ìá’” Ìâ” Ìâ‘” Ìä‘” Ìæ”” Ìç” Ìç” Ìç” Ìç$š” Ìè” Ìè” Ìè	” Ìè” Ìè”% Ìè!”& Ìè"”, Ìè(”- Ìè)”. Ìè*’” Ìé” Ìé›” Ìê” Ìê” Ìê” Ìê” Ìê” Ìê”! Ìê”% Ìê!”& Ìê"”8 Ìê4”: Ìê6œ” Ìë” Ìë
+” Ìë”# Ìë”$ Ìë”0 Ìë*”1 Ìë+”5 Ìë/”6 Ìë0”ÌB Ìë<”ÌC Ìë=”ÌD Ìë>‘”	 Ìì–” Ìì” Ìì” Ìì” Ìì”- Ìì+”/ Ìì-œ” Ìí” Ìí
+” Ìí”( Ìí"”) Ìí#”5 Ìí/”6 Ìí0”: Ìí4”; Ìí5”ÌG ÌíÌA”ÌH ÌíÌB”ÌI ÌíÌC‘”	 Ìîš” Ìï” Ìï
+” Ìï” Ìï” Ìï”* Ìï&”0 Ìï,”2 Ìï.”3 Ìï/”4 Ìï0’” Ìğ” Ìğ‘” Ìò‘” Ìô”” Ìõ” Ìõ” Ìõ” Ìõš” Ìö” Ìö” Ìö	” Ìö” Ìö”$ Ìö ”% Ìö!”, Ìö(”- Ìö)”. Ìö*’” Ì÷” Ì÷›” Ìø” Ìø” Ìø” Ìø” Ìø” Ìø”! Ìø”% Ìø!”& Ìø"”8 Ìø4”: Ìø6œ” Ìù” Ìù
+” Ìù”# Ìù”$ Ìù”0 Ìù*”1 Ìù+”5 Ìù/”6 Ìù0”ÌB Ìù<”ÌC Ìù=”ÌD Ìù>‘”	 Ìú–” Ìú” Ìú” Ìú” Ìú”- Ìú+”/ Ìú-œ” Ìû” Ìû
+” Ìû”( Ìû"”) Ìû#”5 Ìû/”6 Ìû0”: Ìû4”; Ìû5”ÌG ÌûÌA”ÌH ÌûÌB”ÌI ÌûÌC‘”	 Ìüš” Ìı” Ìı
+” Ìı” Ìı” Ìı”# Ìı”* Ìı&”, Ìı(”- Ìı)”. Ìı*’” Ìş” Ìş‘” Í ‘” Í–” Í” Í” Í” Í!” Í#”# Í1œ” Í” Í” Í	” Í” Í”% Í!”& Í"”/ Í+”1 Í-”7 Í3”8 Í4”9 Í5’” Í” Í›” Í” Í” Í” Í” Í” Í”! Í”% Í!”& Í"”8 Í4”: Í6œ” Í” Í
+” Í”# Í”$ Í”0 Í*”1 Í+”5 Í/”6 Í0”ÌB Í<”ÌC Í=”ÌD Í>‘”	 Í–” Í” Í” Í” Í”- Í+”/ Í-œ” Í	” Í	
+” Í	”( Í	"”) Í	#”5 Í	/”6 Í	0”: Í	4”; Í	5”ÌG Í	ÌA”ÌH Í	ÌB”ÌI Í	ÌC‘”	 Í
+’” Í” Í‘” Í‘” Í–” Í”	 Í”
+ Í” Í” Í”! Í(’” Í” Í” Í” Í” Í”  Í”& Í ”5 Í/”6 Í0”ÌD Í>”ÌE Í?”ÌL ÍÌF”ÌN ÍÌH”Ì\ ÍÌV”Ì] ÍÌW”Ì^ ÍÌX’” Í” Í–” Í” Í
+” Í” Í” Í”  Í›” Í” Í
+” Í” Í” Í”! Í”% Í”) Í#”* Í$”< Í6”> Í8š” Í” Í” Í”" Í”# Í”5 Í-”6 Í.”ÌD Í<”ÌF Í>”ÌG Í?‘” Í–” Í” Í” Í” Í”1 Í-”3 Í/š” Í” Í” Í”" Í”# Í”: Í2”; Í3”ÌI ÍÌA”ÌK ÍÌC”ÌL ÍÌD‘” Í” Í” Í” Í” Í”! Í”" Í”- Í'”/ Í)”4 Í.”5 Í/”6 Í0”7 Í1”ÌA Í;›” Í” Í” Í” Í”! Í”" Í”/ Í)”1 Í+”< Í6”= Í7”> Í8” Í” Í” Í” Í”! Í”" Í”4 Í.”6 Í0”: Í4”; Í5”ÌG ÍÌA”ÌH ÍÌB”ÌI ÍÌC” Í” Í” Í” Í”! Í”" Í”- Í'”/ Í)”3 Í-”4 Í.”? Í9”Ì@ Í:”ÌA Í;” Í ” Í ” Í ” Í ”! Í ”" Í ”, Í &”. Í (”2 Í ,”3 Í -”; Í 5”< Í 6”= Í 7” Í!” Í!” Í!” Í!”! Í!”" Í!”1 Í!+”3 Í!-”7 Í!1”8 Í!2”ÌE Í!?”ÌF Í!Ì@”ÌG Í!ÌA—” Í"” Í"” Í"” Í"”# Í"”% Í"”& Í" Ü ” Í$” Í$” Í$” Í$” Í$”* Í$$”5 Í$/”? Í$9”ÌC Í$=”ÌD Í$>”ÌP Í$ÌJ”ÌZ Í$ÌT”Ì^ Í$ÌX”Ì_ Í$ÌY”Ìj Í$Ìd”Ìl Í$Ìf”Ìm Í$Ìg”Ìn Í$Ìh‘”	 Í%”” Í%” Í%” Í%” Í%š” Í&” Í&” Í&” Í&” Í&”' Í&!”, Í&&”. Í&(”/ Í&)”0 Í&*‘”	 Í'’” Í(” Í(‘” Í*‘” Í,–” Í-”	 Í-”
+ Í-” Í-” Í-”$ Í-+’” Í.” Í.” Í/” Í/” Í/”  Í/”& Í/ ”5 Í//”6 Í/0”ÌD Í/>”ÌE Í/?”ÌL Í/ÌF”ÌN Í/ÌH”Ì\ Í/ÌV”Ì] Í/ÌW”Ì^ Í/ÌX” Í1” Í1” Í1”  Í1”& Í1 ”1 Í1+”2 Í1,”5 Í1/”6 Í10”ÌC Í1=”ÌE Í1?”ÌF Í1Ì@”ÌG Í1ÌK”ÌH Í1ÌL” Í2” Í2”" Í2”% Í2”+ Í2%”6 Í20”7 Í21”: Í24”; Í25”ÌM Í2ÌG”ÌO Í2ÌI”ÌP Í2ÌJ”ÌQ Í2ÌU”ÌR Í2ÌV” Í3” Í3” Í3” Í3”$ Í3”/ Í3)”0 Í3*”3 Í3-”4 Í3.”? Í39”ÌA Í3;”ÌB Í3<”ÌC Í3ÌG”ÌD Í3ÌH” Í4” Í4” Í4” Í4”# Í4”. Í4(”/ Í4)”2 Í4,”3 Í4-”= Í47”? Í49”Ì@ Í4:”ÌA Í4ÌE”ÌB Í4ÌF” Í5” Í5” Í5”" Í5”( Í5"”3 Í5-”4 Í5.”7 Í51”8 Í52”ÌG Í5ÌA”ÌI Í5ÌC”ÌL Í5ÌF”ÌM Í5ÌQ”ÌN Í5ÌR—” Í7” Í7
+” Í7” Í7”  Í7”0 Í7*”1 Í7+—” Í8” Í8
+” Í8” Í8” Í8”( Í8"”) Í8#—” Í9” Í9
+” Í9” Í9” Í9”$ Í9”% Í9—” Í:” Í:
+” Í:” Í:”! Í:”. Í:(”/ Í:)” Í<” Í<” Í<” Í<” Í<”* Í<$”5 Í</”? Í<9”ÌO Í<ÌI”ÌY Í<ÌS”Ìb Í<Ì\”Ìd Í<Ì^”Ìe Í<Ì_”Ìf Í<Ì`’” Í>” Í>”” Í?” Í?” Í?” Í?‘”	 Í@”” Í@” Í@” Í@” Í@š” ÍA” ÍA” ÍA” ÍA” ÍA”' ÍA!”, ÍA&”. ÍA(”/ ÍA)”0 ÍA*”” ÍB” ÍB” ÍB” ÍB‘”	 ÍC’” ÍD” ÍD‘” ÍFÔrG–§version¤file§sources®sourcesContent¥names¨mappingsÀ‘À‘ÀÜ4‘”    ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”  	 ‘”  
+ ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”    ‘”  ! ‘”  " ‘”  # ‘”  $ ‘”  % ‘”  & ‘”  ' ‘”  ( ‘”  ) ‘”  * ‘”  + ‘”  , ‘”  - ‘”  . ‘”  / ‘”  0 ‘”  1 ‘”  2 ‘”  3 ‘”  4 ‘”  5 ‘”  6 ‘”  7 ‘”  8 ‘”  9 ‘”  : ‘”  ; ‘”  < ‘”  = ‘”  > ‘”  ? ‘”  Ì@ ‘”  ÌA ‘”  ÌB ‘”  ÌC ‘”  ÌD ‘”  ÌE ‘”  ÌF ‘”  ÌG ‘”  ÌH ‘”  ÌI ‘”  ÌJ ‘”  ÌK ‘”  ÌL ‘”  ÌM ‘”  ÌN ‘”  ÌO ‘”  ÌP ‘”  ÌQ ‘”  ÌR ‘”  ÌS ‘”  ÌT ‘”  ÌU ‘”  ÌV ‘”  ÌW ‘”  ÌX ‘”  ÌY ‘”  ÌZ ‘”  Ì[ ‘”  Ì\ ‘”  Ì] ‘”  Ì^ ‘”  Ì_ ‘”  Ì` ‘”  Ìa ‘”  Ìb ‘”  Ìc ‘”  Ìd ‘”  Ìe ‘”  Ìf ‘”  Ìg ‘”  Ìh ‘”  Ìi ‘”  Ìj ‘”  Ìk ‘”  Ìl ‘”  Ìm ‘”  Ìn ‘”  Ìo ‘”  Ìp ‘”  Ìq ‘”  Ìr ‘”  Ìs ‘”  Ìt ‘”  Ìu ‘”  Ìv ‘”  Ìw ‘”  Ìx ‘”  Ìy ‘”  Ìz ‘”  Ì{ ‘”  Ì| ‘”  Ì} ‘”  Ì~ ‘”  Ì ‘”  Ì€ ‘”  Ì ‘”  Ì‚ ‘”  Ìƒ ‘”  Ì„ ‘”  Ì… ‘”  Ì† ‘”  Ì‡ ‘”  Ìˆ ‘”  Ì‰ ‘”  ÌŠ ‘”  Ì‹ ‘”  ÌŒ ‘”  Ì ‘”  Ì ‘”  Ì ‘”  Ì ‘”  Ì‘ ‘”  Ì’ ‘”  Ì“ ‘”  Ì” ‘”  Ì• ‘”  Ì– ‘”  Ì— ‘”  Ì˜ ‘”  Ì™ ‘”  Ìš ‘”  Ì› ‘”  Ìœ ‘”  Ì ‘”  Ì ‘”  ÌŸ ‘”  Ì  ‘”  Ì¡ ‘”  Ì¢ ‘”  Ì£ ‘”  Ì¤ ‘”  Ì¥ ‘”  Ì¦ ‘”  Ì§ ‘”  Ì¨ ‘”  Ì© ‘”  Ìª ‘”  Ì« ‘”  Ì¬ ‘”  Ì­ ‘”  Ì® ‘”  Ì¯ ‘”  Ì° ‘”  Ì± ‘”  Ì² ‘”  Ì³ ‘”  Ì´ ‘”  Ìµ ‘”  Ì¶ ‘”  Ì· ‘”  Ì¸ ‘”  Ì¹ ‘”  Ìº ‘”  Ì» ‘”  Ì¼ ‘”  Ì½ ‘”  Ì¾ ‘”  Ì¿ ‘”  ÌÀ ‘”  ÌÁ ‘”  ÌÂ ‘”  ÌÃ ‘”  ÌÄ ‘”  ÌÅ ‘”  ÌÆ ‘”  ÌÇ ‘”  ÌÈ ‘”  ÌÉ ‘”  ÌÊ ‘”  ÌË ‘”  ÌÌ ‘”  ÌÍ ‘”  ÌÎ ‘”  ÌÏ ‘”  ÌĞ ‘”  ÌÑ ‘”  ÌÒ ‘”  ÌÓ ‘”  ÌÔ ‘”  ÌÕ ‘”  ÌÖ ‘”  Ì× ‘”  ÌØ ‘”  ÌÙ ‘”  ÌÚ ‘”  ÌÛ ‘”  ÌÜ ‘”  Ìİ ‘”  ÌŞ ‘”  Ìß ‘”  Ìà ‘”  Ìá ‘”  Ìâ ‘”  Ìã ‘”  Ìä ‘”  Ìå ‘”  Ìæ ‘”  Ìç ‘”  Ìè ‘”  Ìé ‘”  Ìê ‘”  Ìë ‘”  Ìì ‘”  Ìí ‘”  Ìî ‘”  Ìï ‘”  Ìğ ‘”  Ìñ ‘”  Ìò ‘”  Ìó ‘”  Ìô ‘”  Ìõ ‘”  Ìö ‘”  Ì÷ ‘”  Ìø ‘”  Ìù ‘”  Ìú ‘”  Ìû ‘”  Ìü ‘”  Ìı ‘”  Ìş ‘”  Ìÿ ‘”  Í  ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í	 ‘”  Í
+ ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í  ‘”  Í! ‘”  Í" ‘”  Í# ‘”  Í$ ‘”  Í% ‘”  Í& ‘”  Í' ‘”  Í( ‘”  Í) ‘”  Í* ‘”  Í+ ‘”  Í, ‘”  Í- ‘”  Í. ‘”  Í/ ‘”  Í0 ‘”  Í1 ‘”  Í2 ‘”  Í3 ÔrH’§missing¦pluginÃ¦genAbcÂÔ  ÔrI”²dynamicImportCache¹exportAllDeclarationCache»exportNamedDeclarationCache«importCache‘ÔrJ–¤type¥start£end«declarationªspecifiers¦source¶ExportNamedDeclarationÍÍ-ËÔrK–¤type¥start£end¢idªsuperClass¤body°ClassDeclarationÍ"Í-ËÔrL”¤type¥start£end¤nameªIdentifierÍ(Í8°PlayerControllerÀÔrM”¤type¥start£end¤body©ClassBodyÍ9Í-ËÜ ÔrN˜¤type¥start£end¦static¨computed£key¤kind¥value°MethodDefinitionÍ@ÍIÂÂLªIdentifierÍ@ÍK«constructor«constructorÔrO™¤type¥start£end¢idªexpression©generator¥async¦params¤body²FunctionExpressionÍKÍIÀÂÂÂM®BlockStatementÍNÍI˜ÔrP”¤type¥start£endªexpression³ExpressionStatementÍÊÍîÔrQ–¤type¥start£end¨operator¤left¥right´AssignmentExpressionÍÊÍí¡=ÔrR—¤type¥start£end¦object¨property¨computed¨optional°MemberExpressionÍÊÍáÔrS“¤type¥start£end®ThisExpressionÍÊÍÎLªIdentifierÍÏÍá²avPlayerControllerÂÂLªIdentifierÍäÍí©undefinedP³ExpressionStatementÍøÍ!Q´AssignmentExpressionÍøÍ ¡=R°MemberExpressionÍøÍS®ThisExpressionÍøÍüLªIdentifierÍıÍ·audioRendererControllerÂÂLªIdentifierÍÍ ©undefinedP³ExpressionStatementÍ+Í@Q´AssignmentExpressionÍ+Í?¡=R°MemberExpressionÍ+Í;S®ThisExpressionÍ+Í/LªIdentifierÍ0Í;«currentTypeÂÂÔrT•¤type¥start£end¥value£raw§LiteralÍ>Í? ¡0P³ExpressionStatementÍJÍ]Q´AssignmentExpressionÍJÍ\¡=R°MemberExpressionÍJÍWS®ThisExpressionÍJÍNLªIdentifierÍOÍW¨songListÂÂÔrU”¤type¥start£end¨elements¯ArrayExpressionÍZÍ\P³ExpressionStatementÍgÍ}Q´AssignmentExpressionÍgÍ|¡=R°MemberExpressionÍgÍxS®ThisExpressionÍgÍkLªIdentifierÍlÍx¬currentIndexÂÂT§LiteralÍ{Í| ¡0P³ExpressionStatementÍ‡Í¬Q´AssignmentExpressionÍ‡Í«¡=R°MemberExpressionÍ‡Í”S®ThisExpressionÍ‡Í‹LªIdentifierÍŒÍ”¨playModeÂÂR°MemberExpressionÍ—Í«LªIdentifierÍ—ÍŸ¨PlayModeLªIdentifierÍ Í««SINGLE_LOOPÂÂP³ExpressionStatementÍ¶ÍÏQ´AssignmentExpressionÍ¶ÍÎ¡=R°MemberExpressionÍ¶ÍÈS®ThisExpressionÍ¶ÍºLªIdentifierÍ»ÍÈ­playbackSpeedÂÂT§LiteralÍËÍÎ£1.0P³ExpressionStatementÍÙÍQ´AssignmentExpressionÍÙÍ¡=R°MemberExpressionÍÙÍêS®ThisExpressionÍÙÍİLªIdentifierÍŞÍê¬eqControllerÂÂÔrV•¤type¥start£end¦callee©arguments­NewExpressionÍíÍLªIdentifierÍñÍ³EqualizerControllerN°MethodDefinitionÍOÍÂÂLªIdentifierÍOÍZ«defaultPlay¦methodO²FunctionExpressionÍZÍÀÂÂÂ‘LªIdentifierÍ[Íl±rawFileDescriptorM®BlockStatementÍnÍ–P³ExpressionStatementÍyÍ¤Q´AssignmentExpressionÍyÍ£¡=R°MemberExpressionÍyÍS®ThisExpressionÍyÍ}LªIdentifierÍ~Í±rawFileDescriptorÂÂLªIdentifierÍ’Í£±rawFileDescriptorP³ExpressionStatementÍ®ÍÃQ´AssignmentExpressionÍ®ÍÂ¡=R°MemberExpressionÍ®Í¾S®ThisExpressionÍ®Í²LªIdentifierÍ³Í¾«currentTypeÂÂT§LiteralÍÁÍÂ¡1P³ExpressionStatementÍÍÍ Q´AssignmentExpressionÍÍÍÿ¡=R°MemberExpressionÍÍÍäS®ThisExpressionÍÍÍÑLªIdentifierÍÒÍä²avPlayerControllerÂÂV­NewExpressionÍçÍÿLªIdentifierÍëÍı²AVPlayerControllerP³ExpressionStatementÍ
+ÍqÔrW–¤type¥start£end¦callee©arguments¨optional®CallExpressionÍ
+ÍpR°MemberExpressionÍ
+Í&R°MemberExpressionÍ
+Í!S®ThisExpressionÍ
+ÍLªIdentifierÍÍ!²avPlayerControllerÂÂLªIdentifierÍ"Í&¤initÂÂ“R°MemberExpressionÍ'Í;LªIdentifierÍ'Í8±rawFileDescriptorLªIdentifierÍ9Í;¢fdÂÂR°MemberExpressionÍ=ÍULªIdentifierÍ=ÍN±rawFileDescriptorLªIdentifierÍOÍU¦offsetÂÂR°MemberExpressionÍWÍoLªIdentifierÍWÍh±rawFileDescriptorLªIdentifierÍiÍo¦lengthÂÂÂP³ExpressionStatementÍ{Í°W®CallExpressionÍ{Í¯R°MemberExpressionÍ{Í›R°MemberExpressionÍ{Í’S®ThisExpressionÍ{ÍLªIdentifierÍ€Í’²avPlayerControllerÂÂLªIdentifierÍ“Í›¨setSpeedÂÂ‘R°MemberExpressionÍœÍ®S®ThisExpressionÍœÍ LªIdentifierÍ¡Í®­playbackSpeedÂÂÂP³ExpressionStatementÍÌÍW®CallExpressionÍÌÍR°MemberExpressionÍÌÍğR°MemberExpressionÍÌÍãS®ThisExpressionÍÌÍĞLªIdentifierÍÑÍã²avPlayerControllerÂÂLªIdentifierÍäÍğ¬setEqualizerÂÂ‘R°MemberExpressionÍñÍS®ThisExpressionÍñÍõLªIdentifierÍöÍ¬eqControllerÂÂÂN°MethodDefinitionÍ™ÍxÂÂLªIdentifierÍ™Í£ªchangeType¦methodO²FunctionExpressionÍ£ÍxÀÂÂÂ’LªIdentifierÍ¤Íµ±rawFileDescriptorLªIdentifierÍ·ÍÀ©audioTypeM®BlockStatementÍÂÍx‘ÔrX–¤type¥start£end¥block§handler©finalizer¬TryStatementÍÍÍqM®BlockStatementÍÑÍ“P³ExpressionStatementÍàÍ	Q´AssignmentExpressionÍàÍ	
+¡=R°MemberExpressionÍàÍöS®ThisExpressionÍàÍäLªIdentifierÍåÍö±rawFileDescriptorÂÂLªIdentifierÍùÍ	
+±rawFileDescriptorÔrY–¤type¥start£end¤testªconsequent©alternate«IfStatementÍ	ÍçÔrZ–¤type¥start£end¤left¨operator¥right±LogicalExpressionÍ	Í	?Z°BinaryExpressionÍ	Í	,LªIdentifierÍ	Í	&©audioType£===T§LiteralÍ	+Í	,¡1¢||Z°BinaryExpressionÍ	0Í	?LªIdentifierÍ	0Í	9©audioType£===T§LiteralÍ	>Í	?¡2M®BlockStatementÍ	AÍ
+_’P³ExpressionStatementÍ	TÍ	zP¯ChainExpressionÍ	TÍ	yW®CallExpressionÍ	TÍ	yR°MemberExpressionÍ	TÍ	wR°MemberExpressionÍ	TÍ	pS®ThisExpressionÍ	TÍ	XLªIdentifierÍ	YÍ	p·audioRendererControllerÂÂLªIdentifierÍ	rÍ	w¥pauseÂÃÂP³ExpressionStatementÍ	ØÍ
+PP¯ChainExpressionÍ	ØÍ
+OW®CallExpressionÍ	ØÍ
+OR°MemberExpressionÍ	ØÍ	öR°MemberExpressionÍ	ØÍ	ïS®ThisExpressionÍ	ØÍ	ÜLªIdentifierÍ	İÍ	ï²avPlayerControllerÂÂLªIdentifierÍ	ñÍ	ö¥resetÂÃ“R°MemberExpressionÍ	÷Í
+R°MemberExpressionÍ	÷Í
+S®ThisExpressionÍ	÷Í	ûLªIdentifierÍ	üÍ
+±rawFileDescriptorÂÂLªIdentifierÍ
+Í
+¢fdÂÂR°MemberExpressionÍ
+Í
+/R°MemberExpressionÍ
+Í
+(S®ThisExpressionÍ
+Í
+LªIdentifierÍ
+Í
+(±rawFileDescriptorÂÂLªIdentifierÍ
+)Í
+/¦offsetÂÂR°MemberExpressionÍ
+1Í
+NR°MemberExpressionÍ
+1Í
+GS®ThisExpressionÍ
+1Í
+5LªIdentifierÍ
+6Í
+G±rawFileDescriptorÂÂLªIdentifierÍ
+HÍ
+N¦lengthÂÂÂM®BlockStatementÍ
+rÍç“P³ExpressionStatementÍ
+ÊÍ
+ëP¯ChainExpressionÍ
+ÊÍ
+êW®CallExpressionÍ
+ÊÍ
+êR°MemberExpressionÍ
+ÊÍ
+èR°MemberExpressionÍ
+ÊÍ
+áS®ThisExpressionÍ
+ÊÍ
+ÎLªIdentifierÍ
+ÏÍ
+á²avPlayerControllerÂÂLªIdentifierÍ
+ãÍ
+è¥pauseÂÃÂY«IfStatementÍÍ¯Z°BinaryExpressionÍÍFR°MemberExpressionÍÍ8S®ThisExpressionÍÍ LªIdentifierÍ!Í8·audioRendererControllerÂÂ£===LªIdentifierÍ=ÍF©undefinedM®BlockStatementÍHÍ¯‘P³ExpressionStatementÍ_ÍœQ´AssignmentExpressionÍ_Í›¡=R°MemberExpressionÍ_Í{S®ThisExpressionÍ_ÍcLªIdentifierÍdÍ{·audioRendererControllerÂÂV­NewExpressionÍ~Í›LªIdentifierÍ‚Í™·AudioRendererControllerÀP³ExpressionStatementÍÍ“W®CallExpressionÍÍ’R°MemberExpressionÍÍ¤W®CallExpressionÍÍŸR°MemberExpressionÍÍFR°MemberExpressionÍÍ4S®ThisExpressionÍÍLªIdentifierÍÍ4·audioRendererControllerÂÂLªIdentifierÍ5ÍF±initAudioRendererÂÂ“R°MemberExpressionÍGÍ`R°MemberExpressionÍGÍ]S®ThisExpressionÍGÍKLªIdentifierÍLÍ]±rawFileDescriptorÂÂLªIdentifierÍ^Í`¢fdÂÂR°MemberExpressionÍbÍR°MemberExpressionÍbÍxS®ThisExpressionÍbÍfLªIdentifierÍgÍx±rawFileDescriptorÂÂLªIdentifierÍyÍ¦offsetÂÂR°MemberExpressionÍÍR°MemberExpressionÍÍ—S®ThisExpressionÍÍ…LªIdentifierÍ†Í—±rawFileDescriptorÂÂLªIdentifierÍ˜Í¦lengthÂÂÂLªIdentifierÍ Í¤¤thenÂÂ‘O·ArrowFunctionExpressionÍ¥Í‘ÀÂÂÂM®BlockStatementÍ«Í‘’P³ExpressionStatementÍàÍP¯ChainExpressionÍàÍW®CallExpressionÍàÍR°MemberExpressionÍàÍ
+R°MemberExpressionÍàÍüS®ThisExpressionÍàÍäLªIdentifierÍåÍü·audioRendererControllerÂÂLªIdentifierÍşÍ
+¬setEqualizerÂÃ‘R°MemberExpressionÍÍS®ThisExpressionÍÍLªIdentifierÍÍ¬eqControllerÂÂÂP³ExpressionStatementÍ4ÍZP¯ChainExpressionÍ4ÍYW®CallExpressionÍ4ÍYR°MemberExpressionÍ4ÍWR°MemberExpressionÍ4ÍPS®ThisExpressionÍ4Í8LªIdentifierÍ9ÍP·audioRendererControllerÂÂLªIdentifierÍRÍW¥startÂÃÂÂP³ExpressionStatementÍõÍQ´AssignmentExpressionÍõÍ¡=R°MemberExpressionÍõÍS®ThisExpressionÍõÍùLªIdentifierÍúÍ«currentTypeÂÂLªIdentifierÍÍ©audioTypeÔr[•¤type¥start£end¥param¤body«CatchClauseÍ'ÍqLªIdentifierÍ.Í3¥errorM®BlockStatementÍ5Íq‘P³ExpressionStatementÍDÍfW®CallExpressionÍDÍeR°MemberExpressionÍDÍPLªIdentifierÍDÍJ¦LoggerLªIdentifierÍKÍP¥errorÂÂ‘T§LiteralÍQÍd±changeType error!³'changeType error!'ÂÀN°MethodDefinitionÍçÍ¡ÂÂLªIdentifierÍçÍì¥start¦methodO²FunctionExpressionÍìÍ¡ÀÂÂÂM®BlockStatementÍïÍ¡‘Y«IfStatementÍúÍšW®CallExpressionÍşÍR°MemberExpressionÍşÍS®ThisExpressionÍşÍLªIdentifierÍÍªisAVPlayerÂÂÂM®BlockStatementÍÍK‘P³ExpressionStatementÍ Í@P¯ChainExpressionÍ Í?W®CallExpressionÍ Í?R°MemberExpressionÍ Í=R°MemberExpressionÍ Í7S®ThisExpressionÍ Í$LªIdentifierÍ%Í7²avPlayerControllerÂÂLªIdentifierÍ9Í=¤playÂÃÂM®BlockStatementÍZÍš‘P³ExpressionStatementÍiÍP¯ChainExpressionÍiÍW®CallExpressionÍiÍR°MemberExpressionÍiÍŒR°MemberExpressionÍiÍ…S®ThisExpressionÍiÍmLªIdentifierÍnÍ…·audioRendererControllerÂÂLªIdentifierÍ‡ÍŒ¥startÂÃÂN°MethodDefinitionÍ§Í_ÂÂLªIdentifierÍ§Í«¤stop¦methodO²FunctionExpressionÍ«Í_ÀÂÂÂM®BlockStatementÍ®Í_‘Y«IfStatementÍ¹ÍXW®CallExpressionÍ½ÍÎR°MemberExpressionÍ½ÍÌS®ThisExpressionÍ½ÍÁLªIdentifierÍÂÍÌªisAVPlayerÂÂÂM®BlockStatementÍĞÍ
+‘P³ExpressionStatementÍßÍÿP¯ChainExpressionÍßÍşW®CallExpressionÍßÍşR°MemberExpressionÍßÍüR°MemberExpressionÍßÍöS®ThisExpressionÍßÍãLªIdentifierÍäÍö²avPlayerControllerÂÂLªIdentifierÍøÍü¤stopÂÃÂM®BlockStatementÍÍX‘P³ExpressionStatementÍ(ÍMP¯ChainExpressionÍ(ÍLW®CallExpressionÍ(ÍLR°MemberExpressionÍ(ÍJR°MemberExpressionÍ(ÍDS®ThisExpressionÍ(Í,LªIdentifierÍ-ÍD·audioRendererControllerÂÂLªIdentifierÍFÍJ¤stopÂÃÂN°MethodDefinitionÍeÍ ÂÂLªIdentifierÍeÍj¥pause¦methodO²FunctionExpressionÍjÍ ÀÂÂÂM®BlockStatementÍmÍ ‘Y«IfStatementÍxÍW®CallExpressionÍ|ÍR°MemberExpressionÍ|Í‹S®ThisExpressionÍ|Í€LªIdentifierÍÍ‹ªisAVPlayerÂÂÂM®BlockStatementÍÍÊ‘P³ExpressionStatementÍÍ¿P¯ChainExpressionÍÍ¾W®CallExpressionÍÍ¾R°MemberExpressionÍÍ¼R°MemberExpressionÍÍµS®ThisExpressionÍÍ¢LªIdentifierÍ£Íµ²avPlayerControllerÂÂLªIdentifierÍ·Í¼¥pauseÂÃÂM®BlockStatementÍÙÍ‘P³ExpressionStatementÍèÍP¯ChainExpressionÍèÍW®CallExpressionÍèÍR°MemberExpressionÍèÍR°MemberExpressionÍèÍS®ThisExpressionÍèÍìLªIdentifierÍíÍ·audioRendererControllerÂÂLªIdentifierÍÍ¥pauseÂÃÂN°MethodDefinitionÍçÍ@ÂÂLªIdentifierÍçÍë¤seek¦methodO²FunctionExpressionÍëÍ@ÀÂÂÂ‘LªIdentifierÍìÍ÷«currentTimeM®BlockStatementÍùÍ@‘Y«IfStatementÍÍ9W®CallExpressionÍÍR°MemberExpressionÍÍS®ThisExpressionÍÍLªIdentifierÍÍªisAVPlayerÂÂÂM®BlockStatementÍÍ`‘P³ExpressionStatementÍ*ÍUP¯ChainExpressionÍ*ÍTW®CallExpressionÍ*ÍTR°MemberExpressionÍ*ÍGR°MemberExpressionÍ*ÍAS®ThisExpressionÍ*Í.LªIdentifierÍ/ÍA²avPlayerControllerÂÂLªIdentifierÍCÍG¤seekÂÃ‘LªIdentifierÍHÍS«currentTimeÂM®BlockStatementÍoÍ9‘P³ExpressionStatementÍ¿ÍïP¯ChainExpressionÍ¿ÍîW®CallExpressionÍ¿ÍîR°MemberExpressionÍ¿ÍáR°MemberExpressionÍ¿ÍÛS®ThisExpressionÍ¿ÍÃLªIdentifierÍÄÍÛ·audioRendererControllerÂÂLªIdentifierÍİÍá¤seekÂÃ‘LªIdentifierÍâÍí«currentTimeÂN°MethodDefinitionÍ¯Í‘ÂÂLªIdentifierÍ¯Í¶§release¦methodO²FunctionExpressionÍ¶Í‘ÀÂÂÂM®BlockStatementÍ¹Í‘’Y«IfStatementÍÄÍR°MemberExpressionÍÈÍßS®ThisExpressionÍÈÍÌLªIdentifierÍÍÍß²avPlayerControllerÂÂM®BlockStatementÍáÍ‘P³ExpressionStatementÍğÍW®CallExpressionÍğÍR°MemberExpressionÍğÍR°MemberExpressionÍğÍS®ThisExpressionÍğÍôLªIdentifierÍõÍ²avPlayerControllerÂÂLªIdentifierÍÍ§releaseÂÂÂÀY«IfStatementÍ'ÍŠR°MemberExpressionÍ+ÍGS®ThisExpressionÍ+Í/LªIdentifierÍ0ÍG·audioRendererControllerÂÂM®BlockStatementÍIÍŠ‘P³ExpressionStatementÍXÍW®CallExpressionÍXÍ~R°MemberExpressionÍXÍ|R°MemberExpressionÍXÍtS®ThisExpressionÍXÍ\LªIdentifierÍ]Ít·audioRendererControllerÂÂLªIdentifierÍuÍ|§releaseÂÂÂÀN°MethodDefinitionÍüÍSÂÂLªIdentifierÍüÍªisAVPlayer¦methodO²FunctionExpressionÍÍSÀÂÂÂM®BlockStatementÍ	ÍS‘Ôr\”¤type¥start£end¨argument¯ReturnStatementÍÍLZ±LogicalExpressionÍÍKZ°BinaryExpressionÍÍ1R°MemberExpressionÍÍ+S®ThisExpressionÍÍLªIdentifierÍ Í+«currentTypeÂÂ£===T§LiteralÍ0Í1¡1¢||Z°BinaryExpressionÍ5ÍKR°MemberExpressionÍ5ÍES®ThisExpressionÍ5Í9LªIdentifierÍ:ÍE«currentTypeÂÂ£===T§LiteralÍJÍK¡2N°MethodDefinitionÍhÍâÂÂLªIdentifierÍhÍs«setPlayList¦methodO²FunctionExpressionÍsÍâÀÂÂÂ’LªIdentifierÍtÍ|¨songListLªIdentifierÍ~ÍŠ¬currentIndexM®BlockStatementÍŒÍâ’P³ExpressionStatementÍ—Í°Q´AssignmentExpressionÍ—Í¯¡=R°MemberExpressionÍ—Í¤S®ThisExpressionÍ—Í›LªIdentifierÍœÍ¤¨songListÂÂLªIdentifierÍ§Í¯¨songListP³ExpressionStatementÍºÍÛQ´AssignmentExpressionÍºÍÚ¡=R°MemberExpressionÍºÍËS®ThisExpressionÍºÍ¾LªIdentifierÍ¿ÍË¬currentIndexÂÂLªIdentifierÍÎÍÚ¬currentIndexN°MethodDefinitionÍùÍ6ÂÂLªIdentifierÍùÍ¯getCurrentIndex¦methodO²FunctionExpressionÍÍ6ÀÂÂÂM®BlockStatementÍÍ6‘\¯ReturnStatementÍÍ/R°MemberExpressionÍÍ.S®ThisExpressionÍÍ!LªIdentifierÍ"Í.¬currentIndexÂÂN°MethodDefinitionÍIÍİÂÂLªIdentifierÍIÍSªswitchSong¦methodO²FunctionExpressionÍSÍİÀÂÂÂ“LªIdentifierÍTÍY¥indexLªIdentifierÍ[Íl±rawFileDescriptorLªIdentifierÍnÍw©audioTypeM®BlockStatementÍyÍİ’P³ExpressionStatementÍ„ÍQ´AssignmentExpressionÍ„Í¡=R°MemberExpressionÍ„Í•S®ThisExpressionÍ„ÍˆLªIdentifierÍ‰Í•¬currentIndexÂÂLªIdentifierÍ˜Í¥indexP³ExpressionStatementÍ¨ÍÖW®CallExpressionÍ¨ÍÕR°MemberExpressionÍ¨Í·S®ThisExpressionÍ¨Í¬LªIdentifierÍ­Í·ªchangeTypeÂÂ’LªIdentifierÍ¸ÍÉ±rawFileDescriptorLªIdentifierÍËÍÔ©audioTypeÂN°MethodDefinitionÍïÍÂÂLªIdentifierÍïÍû¬previousSong¦methodO²FunctionExpressionÍûÍÀÂÂÂ’LªIdentifierÍüÍ±rawFileDescriptorLªIdentifierÍÍ©audioTypeM®BlockStatementÍÍ•Y«IfStatementÍ%ÍxZ°BinaryExpressionÍ)ÍCR°MemberExpressionÍ)Í=R°MemberExpressionÍ)Í6S®ThisExpressionÍ)Í-LªIdentifierÍ.Í6¨songListÂÂLªIdentifierÍ7Í=¦lengthÂÂ£===T§LiteralÍBÍC ¡0M®BlockStatementÍEÍx‘\¯ReturnStatementÍTÍmR°MemberExpressionÍ[ÍlS®ThisExpressionÍ[Í_LªIdentifierÍ`Íl¬currentIndexÂÂÀÔr]•¤type¥start£end¬declarations¤kind³VariableDeclarationÍ‚Í‘Ôr^•¤type¥start£end¢id¤init²VariableDeclaratorÍ†ÍLªIdentifierÍ†Í¨newIndexÀ£letÔr_•¤type¥start£end¬discriminant¥cases¯SwitchStatementÍ™Í¢R°MemberExpressionÍ¡Í®S®ThisExpressionÍ¡Í¥LªIdentifierÍ¦Í®¨playModeÂÂ”Ôr`•¤type¥start£endªconsequent¤testªSwitchCaseÍ¿Í:’P³ExpressionStatementÍæÍ"Q´AssignmentExpressionÍæÍ!¡=LªIdentifierÍæÍî¨newIndexW®CallExpressionÍñÍ!R°MemberExpressionÍñÍûLªIdentifierÍñÍõ¤MathLªIdentifierÍöÍû¥floorÂÂ‘Z°BinaryExpressionÍüÍ W®CallExpressionÍüÍ	R°MemberExpressionÍüÍLªIdentifierÍüÍ ¤MathLªIdentifierÍÍ¦randomÂÂÂ¡*R°MemberExpressionÍÍ R°MemberExpressionÍÍS®ThisExpressionÍÍLªIdentifierÍÍ¨songListÂÂLªIdentifierÍÍ ¦lengthÂÂÂÔra”¤type¥start£end¥label®BreakStatementÍ4Í:ÀR°MemberExpressionÍÄÍÓLªIdentifierÍÄÍÌ¨PlayModeLªIdentifierÍÍÍÓ¦RANDOMÂÂ`ªSwitchCaseÍHÍÛ’P³ExpressionStatementÍrÍÃQ´AssignmentExpressionÍrÍÂ¡=LªIdentifierÍrÍz¨newIndexZ°BinaryExpressionÍ}ÍÂZ°BinaryExpressionÍ~ÍªZ°BinaryExpressionÍ~Í“R°MemberExpressionÍ~ÍS®ThisExpressionÍ~Í‚LªIdentifierÍƒÍ¬currentIndexÂÂ¡-T§LiteralÍ’Í“¡1¡+R°MemberExpressionÍ–ÍªR°MemberExpressionÍ–Í£S®ThisExpressionÍ–ÍšLªIdentifierÍ›Í£¨songListÂÂLªIdentifierÍ¤Íª¦lengthÂÂ¡%R°MemberExpressionÍ®ÍÂR°MemberExpressionÍ®Í»S®ThisExpressionÍ®Í²LªIdentifierÍ³Í»¨songListÂÂLªIdentifierÍ¼ÍÂ¦lengthÂÂa®BreakStatementÍÕÍÛÀR°MemberExpressionÍMÍ_LªIdentifierÍMÍU¨PlayModeLªIdentifierÍVÍ_©LIST_LOOPÂÂ`ªSwitchCaseÍéÍR°MemberExpressionÍîÍLªIdentifierÍîÍö¨PlayModeLªIdentifierÍ÷Í«SINGLE_LOOPÂÂ`ªSwitchCaseÍÍ—’P³ExpressionStatementÍ+ÍQ´AssignmentExpressionÍ+Í~¡=LªIdentifierÍ+Í3¨newIndexYµConditionalExpressionÍ6Í~Z°BinaryExpressionÍ6ÍKR°MemberExpressionÍ6ÍGS®ThisExpressionÍ6Í:LªIdentifierÍ;ÍG¬currentIndexÂÂ¡>T§LiteralÍJÍK ¡0Z°BinaryExpressionÍNÍcR°MemberExpressionÍNÍ_S®ThisExpressionÍNÍRLªIdentifierÍSÍ_¬currentIndexÂÂ¡-T§LiteralÍbÍc¡1Z°BinaryExpressionÍfÍ~R°MemberExpressionÍfÍzR°MemberExpressionÍfÍsS®ThisExpressionÍfÍjLªIdentifierÍkÍs¨songListÂÂLªIdentifierÍtÍz¦lengthÂÂ¡-T§LiteralÍ}Í~¡1a®BreakStatementÍ‘Í—ÀÀP³ExpressionStatementÍ¬ÍäW®CallExpressionÍ¬ÍãR°MemberExpressionÍ¬Í»S®ThisExpressionÍ¬Í°LªIdentifierÍ±Í»ªswitchSongÂÂ“LªIdentifierÍ¼ÍÄ¨newIndexLªIdentifierÍÆÍ×±rawFileDescriptorLªIdentifierÍÙÍâ©audioTypeÂ\¯ReturnStatementÍîÍşLªIdentifierÍõÍı¨newIndexN°MethodDefinitionÍÍÂÂLªIdentifierÍÍ¨nextSong¦methodO²FunctionExpressionÍÍÀÂÂÂ’LªIdentifierÍ Í1±rawFileDescriptorLªIdentifierÍ3Í<©audioTypeM®BlockStatementÍ>Í•Y«IfStatementÍIÍœZ°BinaryExpressionÍMÍgR°MemberExpressionÍMÍaR°MemberExpressionÍMÍZS®ThisExpressionÍMÍQLªIdentifierÍRÍZ¨songListÂÂLªIdentifierÍ[Ía¦lengthÂÂ£===T§LiteralÍfÍg ¡0M®BlockStatementÍiÍœ‘\¯ReturnStatementÍxÍ‘R°MemberExpressionÍÍS®ThisExpressionÍÍƒLªIdentifierÍ„Í¬currentIndexÂÂÀ]³VariableDeclarationÍ¦Í³‘^²VariableDeclaratorÍªÍ²LªIdentifierÍªÍ²¨newIndexÀ£let_¯SwitchStatementÍ½Í¯R°MemberExpressionÍÅÍÒS®ThisExpressionÍÅÍÉLªIdentifierÍÊÍÒ¨playModeÂÂ”`ªSwitchCaseÍãÍ^’P³ExpressionStatementÍ
+ÍFQ´AssignmentExpressionÍ
+ÍE¡=LªIdentifierÍ
+Í¨newIndexW®CallExpressionÍÍER°MemberExpressionÍÍLªIdentifierÍÍ¤MathLªIdentifierÍÍ¥floorÂÂ‘Z°BinaryExpressionÍ ÍDW®CallExpressionÍ Í-R°MemberExpressionÍ Í+LªIdentifierÍ Í$¤MathLªIdentifierÍ%Í+¦randomÂÂÂ¡*R°MemberExpressionÍ0ÍDR°MemberExpressionÍ0Í=S®ThisExpressionÍ0Í4LªIdentifierÍ5Í=¨songListÂÂLªIdentifierÍ>ÍD¦lengthÂÂÂa®BreakStatementÍXÍ^ÀR°MemberExpressionÍèÍ÷LªIdentifierÍèÍğ¨PlayModeLªIdentifierÍñÍ÷¦RANDOMÂÂ`ªSwitchCaseÍlÍè’P³ExpressionStatementÍ–ÍĞQ´AssignmentExpressionÍ–ÍÏ¡=LªIdentifierÍ–Í¨newIndexZ°BinaryExpressionÍ¡ÍÏZ°BinaryExpressionÍ¢Í·R°MemberExpressionÍ¢Í³S®ThisExpressionÍ¢Í¦LªIdentifierÍ§Í³¬currentIndexÂÂ¡+T§LiteralÍ¶Í·¡1¡%R°MemberExpressionÍ»ÍÏR°MemberExpressionÍ»ÍÈS®ThisExpressionÍ»Í¿LªIdentifierÍÀÍÈ¨songListÂÂLªIdentifierÍÉÍÏ¦lengthÂÂa®BreakStatementÍâÍèÀR°MemberExpressionÍqÍƒLªIdentifierÍqÍy¨PlayModeLªIdentifierÍzÍƒ©LIST_LOOPÂÂ`ªSwitchCaseÍöÍR°MemberExpressionÍûÍLªIdentifierÍûÍ¨PlayModeLªIdentifierÍÍ«SINGLE_LOOPÂÂ`ªSwitchCaseÍÍ¤’P³ExpressionStatementÍ8ÍŒQ´AssignmentExpressionÍ8Í‹¡=LªIdentifierÍ8Í@¨newIndexYµConditionalExpressionÍCÍ‹Z°BinaryExpressionÍCÍoR°MemberExpressionÍCÍTS®ThisExpressionÍCÍGLªIdentifierÍHÍT¬currentIndexÂÂ¡<Z°BinaryExpressionÍWÍoR°MemberExpressionÍWÍkR°MemberExpressionÍWÍdS®ThisExpressionÍWÍ[LªIdentifierÍ\Íd¨songListÂÂLªIdentifierÍeÍk¦lengthÂÂ¡-T§LiteralÍnÍo¡1Z°BinaryExpressionÍrÍ‡R°MemberExpressionÍrÍƒS®ThisExpressionÍrÍvLªIdentifierÍwÍƒ¬currentIndexÂÂ¡+T§LiteralÍ†Í‡¡1T§LiteralÍŠÍ‹ ¡0a®BreakStatementÍÍ¤ÀÀP³ExpressionStatementÍ¹ÍñW®CallExpressionÍ¹ÍğR°MemberExpressionÍ¹ÍÈS®ThisExpressionÍ¹Í½LªIdentifierÍ¾ÍÈªswitchSongÂÂ“LªIdentifierÍÉÍÑ¨newIndexLªIdentifierÍÓÍä±rawFileDescriptorLªIdentifierÍæÍï©audioTypeÂ\¯ReturnStatementÍûÍLªIdentifierÍÍ
+¨newIndexN°MethodDefinitionÍ'Í`ÂÂLªIdentifierÍ'Í2«setPlayMode¦methodO²FunctionExpressionÍ2Í`ÀÂÂÂ‘LªIdentifierÍ3Í7¤modeM®BlockStatementÍ9Í`‘P³ExpressionStatementÍDÍYQ´AssignmentExpressionÍDÍX¡=R°MemberExpressionÍDÍQS®ThisExpressionÍDÍHLªIdentifierÍIÍQ¨playModeÂÂLªIdentifierÍTÍX¤modeN°MethodDefinitionÍuÍªÂÂLªIdentifierÍuÍ€«getPlayMode¦methodO²FunctionExpressionÍ€ÍªÀÂÂÂM®BlockStatementÍƒÍª‘\¯ReturnStatementÍÍ£R°MemberExpressionÍ•Í¢S®ThisExpressionÍ•Í™LªIdentifierÍšÍ¢¨playModeÂÂN°MethodDefinitionÍ¿ÍÇÂÂLªIdentifierÍ¿ÍÏ°setPlaybackSpeed¦methodO²FunctionExpressionÍÏÍÇÀÂÂÂ‘LªIdentifierÍĞÍÕ¥speedM®BlockStatementÍ×ÍÇ’P³ExpressionStatementÍâÍıQ´AssignmentExpressionÍâÍü¡=R°MemberExpressionÍâÍôS®ThisExpressionÍâÍæLªIdentifierÍçÍô­playbackSpeedÂÂLªIdentifierÍ÷Íü¥speedY«IfStatementÍÍÀW®CallExpressionÍÍR°MemberExpressionÍÍS®ThisExpressionÍÍLªIdentifierÍÍªisAVPlayerÂÂÂM®BlockStatementÍÍa‘P³ExpressionStatementÍ-ÍVP¯ChainExpressionÍ-ÍUW®CallExpressionÍ-ÍUR°MemberExpressionÍ-ÍNR°MemberExpressionÍ-ÍDS®ThisExpressionÍ-Í1LªIdentifierÍ2ÍD²avPlayerControllerÂÂLªIdentifierÍFÍN¨setSpeedÂÃ‘LªIdentifierÍOÍT¥speedÂM®BlockStatementÍpÍÀ‘P³ExpressionStatementÍÍµP¯ChainExpressionÍÍ´W®CallExpressionÍÍ´R°MemberExpressionÍÍ­R°MemberExpressionÍÍ›S®ThisExpressionÍÍƒLªIdentifierÍ„Í›·audioRendererControllerÂÂLªIdentifierÍÍ­°setPlaybackSpeedÂÃ‘LªIdentifierÍ®Í³¥speedÂN°MethodDefinitionÍÜÍÂÂLªIdentifierÍÜÍì°getPlaybackSpeed¦methodO²FunctionExpressionÍìÍÀÂÂÂM®BlockStatementÍïÍ‘\¯ReturnStatementÍúÍR°MemberExpressionÍÍS®ThisExpressionÍÍLªIdentifierÍÍ­playbackSpeedÂÂN°MethodDefinitionÍDÍ~ÂÂLªIdentifierÍDÍP¬getEqualizer¦methodO²FunctionExpressionÍPÍ~ÀÂÂÂM®BlockStatementÍSÍ~‘\¯ReturnStatementÍ^ÍwR°MemberExpressionÍeÍvS®ThisExpressionÍeÍiLªIdentifierÍjÍv¬eqControllerÂÂN°MethodDefinitionÍ¦Í!XÂÂLªIdentifierÍ¦Í³­applyEqPreset¦methodO²FunctionExpressionÍ³Í!XÀÂÂÂ‘LªIdentifierÍ´Íº¦presetM®BlockStatementÍ¼Í!X“P³ExpressionStatementÍÇÍíW®CallExpressionÍÇÍìR°MemberExpressionÍÇÍäR°MemberExpressionÍÇÍØS®ThisExpressionÍÇÍËLªIdentifierÍÌÍØ¬eqControllerÂÂLªIdentifierÍÙÍä«applyPresetÂÂ‘LªIdentifierÍåÍë¦presetÂY«IfStatementÍ Í!Z±LogicalExpressionÍ Í ?W®CallExpressionÍ Í $R°MemberExpressionÍ Í "S®ThisExpressionÍ Í LªIdentifierÍ Í "ªisAVPlayerÂÂÂ¢&&R°MemberExpressionÍ (Í ?S®ThisExpressionÍ (Í ,LªIdentifierÍ -Í ?²avPlayerControllerÂÂM®BlockStatementÍ AÍ “‘P³ExpressionStatementÍ PÍ ˆW®CallExpressionÍ PÍ ‡R°MemberExpressionÍ PÍ tR°MemberExpressionÍ PÍ gS®ThisExpressionÍ PÍ TLªIdentifierÍ UÍ g²avPlayerControllerÂÂLªIdentifierÍ hÍ t¬setEqualizerÂÂ‘R°MemberExpressionÍ uÍ †S®ThisExpressionÍ uÍ yLªIdentifierÍ zÍ †¬eqControllerÂÂÂY«IfStatementÍ ¢Í!R°MemberExpressionÍ ¦Í ÂS®ThisExpressionÍ ¦Í ªLªIdentifierÍ «Í Â·audioRendererControllerÂÂM®BlockStatementÍ ÄÍ!‘P³ExpressionStatementÍ ÓÍ!W®CallExpressionÍ ÓÍ!R°MemberExpressionÍ ÓÍ üR°MemberExpressionÍ ÓÍ ïS®ThisExpressionÍ ÓÍ ×LªIdentifierÍ ØÍ ï·audioRendererControllerÂÂLªIdentifierÍ ğÍ ü¬setEqualizerÂÂ‘R°MemberExpressionÍ ıÍ!S®ThisExpressionÍ ıÍ!LªIdentifierÍ!Í!¬eqControllerÂÂÂÀP³ExpressionStatementÍ!%Í!QW®CallExpressionÍ!%Í!PR°MemberExpressionÍ!%Í!0LªIdentifierÍ!%Í!+¦LoggerLªIdentifierÍ!,Í!0¤infoÂÂ‘Ôrb•¤type¥start£end«expressions¦quasis¯TemplateLiteralÍ!1Í!O‘LªIdentifierÍ!GÍ!M¦preset’Ôrc•¤type¥start£end¥value¤tail¯TemplateElementÍ!2Í!EÔrd’£raw¦cooked³EQ preset applied: ³EQ preset applied: Âc¯TemplateElementÍ!NÍ!Nd  ÃÂN°MethodDefinitionÍ!‚Í#*ÂÂLªIdentifierÍ!‚Í!¬setEqEnabled¦methodO²FunctionExpressionÍ!Í#*ÀÂÂÂ‘LªIdentifierÍ!Í!–§enabledM®BlockStatementÍ!˜Í#*“P³ExpressionStatementÍ!£Í!ÉW®CallExpressionÍ!£Í!ÈR°MemberExpressionÍ!£Í!¿R°MemberExpressionÍ!£Í!´S®ThisExpressionÍ!£Í!§LªIdentifierÍ!¨Í!´¬eqControllerÂÂLªIdentifierÍ!µÍ!¿ªsetEnabledÂÂ‘LªIdentifierÍ!ÀÍ!Ç§enabledÂY«IfStatementÍ!çÍ"óZ±LogicalExpressionÍ!ëÍ"W®CallExpressionÍ!ëÍ!üR°MemberExpressionÍ!ëÍ!úS®ThisExpressionÍ!ëÍ!ïLªIdentifierÍ!ğÍ!úªisAVPlayerÂÂÂ¢&&R°MemberExpressionÍ" Í"S®ThisExpressionÍ" Í"LªIdentifierÍ"Í"²avPlayerControllerÂÂM®BlockStatementÍ"Í"k‘P³ExpressionStatementÍ"(Í"`W®CallExpressionÍ"(Í"_R°MemberExpressionÍ"(Í"LR°MemberExpressionÍ"(Í"?S®ThisExpressionÍ"(Í",LªIdentifierÍ"-Í"?²avPlayerControllerÂÂLªIdentifierÍ"@Í"L¬setEqualizerÂÂ‘R°MemberExpressionÍ"MÍ"^S®ThisExpressionÍ"MÍ"QLªIdentifierÍ"RÍ"^¬eqControllerÂÂÂY«IfStatementÍ"zÍ"óR°MemberExpressionÍ"~Í"šS®ThisExpressionÍ"~Í"‚LªIdentifierÍ"ƒÍ"š·audioRendererControllerÂÂM®BlockStatementÍ"œÍ"ó‘P³ExpressionStatementÍ"«Í"èW®CallExpressionÍ"«Í"çR°MemberExpressionÍ"«Í"ÔR°MemberExpressionÍ"«Í"ÇS®ThisExpressionÍ"«Í"¯LªIdentifierÍ"°Í"Ç·audioRendererControllerÂÂLªIdentifierÍ"ÈÍ"Ô¬setEqualizerÂÂ‘R°MemberExpressionÍ"ÕÍ"æS®ThisExpressionÍ"ÕÍ"ÙLªIdentifierÍ"ÚÍ"æ¬eqControllerÂÂÂÀP³ExpressionStatementÍ"ıÍ##W®CallExpressionÍ"ıÍ#"R°MemberExpressionÍ"ıÍ#LªIdentifierÍ"ıÍ#¦LoggerLªIdentifierÍ#Í#¤infoÂÂ‘b¯TemplateLiteralÍ#	Í#!‘LªIdentifierÍ#Í#§enabled’c¯TemplateElementÍ#
+Í#d¬EQ enabled: ¬EQ enabled: Âc¯TemplateElementÍ# Í# d  ÃÂN°MethodDefinitionÍ#SÍ$áÂÂLªIdentifierÍ#SÍ#`­setEqBandGain¦methodO²FunctionExpressionÍ#`Í$áÀÂÂÂ’LªIdentifierÍ#aÍ#j©bandIndexLªIdentifierÍ#lÍ#r¦gainDbM®BlockStatementÍ#tÍ$á’P³ExpressionStatementÍ#Í#°W®CallExpressionÍ#Í#¯R°MemberExpressionÍ#Í#œR°MemberExpressionÍ#Í#S®ThisExpressionÍ#Í#ƒLªIdentifierÍ#„Í#¬eqControllerÂÂLªIdentifierÍ#‘Í#œ«setBandGainÂÂ’LªIdentifierÍ#Í#¦©bandIndexLªIdentifierÍ#¨Í#®¦gainDbÂY«IfStatementÍ#ÎÍ$ÚZ±LogicalExpressionÍ#ÒÍ#şW®CallExpressionÍ#ÒÍ#ãR°MemberExpressionÍ#ÒÍ#áS®ThisExpressionÍ#ÒÍ#ÖLªIdentifierÍ#×Í#áªisAVPlayerÂÂÂ¢&&R°MemberExpressionÍ#çÍ#şS®ThisExpressionÍ#çÍ#ëLªIdentifierÍ#ìÍ#ş²avPlayerControllerÂÂM®BlockStatementÍ$ Í$R‘P³ExpressionStatementÍ$Í$GW®CallExpressionÍ$Í$FR°MemberExpressionÍ$Í$3R°MemberExpressionÍ$Í$&S®ThisExpressionÍ$Í$LªIdentifierÍ$Í$&²avPlayerControllerÂÂLªIdentifierÍ$'Í$3¬setEqualizerÂÂ‘R°MemberExpressionÍ$4Í$ES®ThisExpressionÍ$4Í$8LªIdentifierÍ$9Í$E¬eqControllerÂÂÂY«IfStatementÍ$aÍ$ÚR°MemberExpressionÍ$eÍ$S®ThisExpressionÍ$eÍ$iLªIdentifierÍ$jÍ$·audioRendererControllerÂÂM®BlockStatementÍ$ƒÍ$Ú‘P³ExpressionStatementÍ$’Í$ÏW®CallExpressionÍ$’Í$ÎR°MemberExpressionÍ$’Í$»R°MemberExpressionÍ$’Í$®S®ThisExpressionÍ$’Í$–LªIdentifierÍ$—Í$®·audioRendererControllerÂÂLªIdentifierÍ$¯Í$»¬setEqualizerÂÂ‘R°MemberExpressionÍ$¼Í$ÍS®ThisExpressionÍ$¼Í$ÀLªIdentifierÍ$ÁÍ$Í¬eqControllerÂÂÂÀN°MethodDefinitionÍ%Í)ªÂÂLªIdentifierÍ%!Í%0¯savePlayerState¦methodO²FunctionExpressionÍ%0Í)ªÀÂÂÃ‘LªIdentifierÍ%1Í%8§contextM®BlockStatementÍ%:Í)ª‘X¬TryStatementÍ%EÍ)£M®BlockStatementÍ%IÍ)M›]³VariableDeclarationÍ%XÍ%ª‘^²VariableDeclaratorÍ%^Í%©LªIdentifierÍ%^Í%i«preferences\¯AwaitExpressionÍ%lÍ%©W®CallExpressionÍ%rÍ%©R°MemberExpressionÍ%rÍ%LªIdentifierÍ%rÍ%¯dataPreferencesLªIdentifierÍ%‚Í%®getPreferencesÂÂ’LªIdentifierÍ%‘Í%˜§contextT§LiteralÍ%šÍ%¨¬player_state®'player_state'Â¥const]³VariableDeclarationÍ%ÑÍ%å‘^²VariableDeclaratorÍ%ÕÍ%äLªIdentifierÍ%ÕÍ%à«currentTimeT§LiteralÍ%ãÍ%ä ¡0£letY«IfStatementÍ%óÍ'Z±LogicalExpressionÍ%÷Í&#W®CallExpressionÍ%÷Í&R°MemberExpressionÍ%÷Í&S®ThisExpressionÍ%÷Í%ûLªIdentifierÍ%üÍ&ªisAVPlayerÂÂÂ¢&&R°MemberExpressionÍ&Í&#S®ThisExpressionÍ&Í&LªIdentifierÍ&Í&#²avPlayerControllerÂÂM®BlockStatementÍ&%Í&~‘P³ExpressionStatementÍ&8Í&oQ´AssignmentExpressionÍ&8Í&n¡=LªIdentifierÍ&8Í&C«currentTimeW®CallExpressionÍ&FÍ&nR°MemberExpressionÍ&FÍ&lR°MemberExpressionÍ&FÍ&]S®ThisExpressionÍ&FÍ&JLªIdentifierÍ&KÍ&]²avPlayerControllerÂÂLªIdentifierÍ&^Í&l®getCurrentTimeÂÂÂY«IfStatementÍ&‘Í'R°MemberExpressionÍ&•Í&±S®ThisExpressionÍ&•Í&™LªIdentifierÍ&šÍ&±·audioRendererControllerÂÂM®BlockStatementÍ&³Í'‘P³ExpressionStatementÍ&ÆÍ'Q´AssignmentExpressionÍ&ÆÍ'¡=LªIdentifierÍ&ÆÍ&Ñ«currentTimeW®CallExpressionÍ&ÔÍ'R°MemberExpressionÍ&ÔÍ&ÿR°MemberExpressionÍ&ÔÍ&ğS®ThisExpressionÍ&ÔÍ&ØLªIdentifierÍ&ÙÍ&ğ·audioRendererControllerÂÂLªIdentifierÍ&ñÍ&ÿ®getCurrentTimeÂÂÂÀP³ExpressionStatementÍ'Í'I\¯AwaitExpressionÍ'Í'HW®CallExpressionÍ'%Í'HR°MemberExpressionÍ'%Í'4LªIdentifierÍ'%Í'0«preferencesLªIdentifierÍ'1Í'4£putÂÂ’T§LiteralÍ'5Í'@©isPlaying«'isPlaying'T§LiteralÍ'BÍ'GÂ¥falseÂP³ExpressionStatementÍ'bÍ'”\¯AwaitExpressionÍ'bÍ'“W®CallExpressionÍ'hÍ'“R°MemberExpressionÍ'hÍ'wLªIdentifierÍ'hÍ's«preferencesLªIdentifierÍ'tÍ'w£putÂÂ’T§LiteralÍ'xÍ'…«currentTime­'currentTime'LªIdentifierÍ'‡Í'’«currentTimeÂP³ExpressionStatementÍ'¢Í'ß\¯AwaitExpressionÍ'¢Í'ŞW®CallExpressionÍ'¨Í'ŞR°MemberExpressionÍ'¨Í'·LªIdentifierÍ'¨Í'³«preferencesLªIdentifierÍ'´Í'·£putÂÂ’T§LiteralÍ'¸Í'Ê°currentSongIndex²'currentSongIndex'R°MemberExpressionÍ'ÌÍ'İS®ThisExpressionÍ'ÌÍ'ĞLªIdentifierÍ'ÑÍ'İ¬currentIndexÂÂÂP³ExpressionStatementÍ'íÍ("\¯AwaitExpressionÍ'íÍ(!W®CallExpressionÍ'óÍ(!R°MemberExpressionÍ'óÍ(LªIdentifierÍ'óÍ'ş«preferencesLªIdentifierÍ'ÿÍ(£putÂÂ’T§LiteralÍ(Í(©audioType«'audioType'R°MemberExpressionÍ(Í( S®ThisExpressionÍ(Í(LªIdentifierÍ(Í( «currentTypeÂÂÂP³ExpressionStatementÍ(0Í(a\¯AwaitExpressionÍ(0Í(`W®CallExpressionÍ(6Í(`R°MemberExpressionÍ(6Í(ELªIdentifierÍ(6Í(A«preferencesLªIdentifierÍ(BÍ(E£putÂÂ’T§LiteralÍ(FÍ(P¨playModeª'playMode'R°MemberExpressionÍ(RÍ(_S®ThisExpressionÍ(RÍ(VLªIdentifierÍ(WÍ(_¨playModeÂÂÂP³ExpressionStatementÍ(oÍ(ª\¯AwaitExpressionÍ(oÍ(©W®CallExpressionÍ(uÍ(©R°MemberExpressionÍ(uÍ(„LªIdentifierÍ(uÍ(€«preferencesLªIdentifierÍ(Í(„£putÂÂ’T§LiteralÍ(…Í(”­playbackSpeed¯'playbackSpeed'R°MemberExpressionÍ(–Í(¨S®ThisExpressionÍ(–Í(šLªIdentifierÍ(›Í(¨­playbackSpeedÂÂÂP³ExpressionStatementÍ(¸Í(Ò\¯AwaitExpressionÍ(¸Í(ÑW®CallExpressionÍ(¾Í(ÑR°MemberExpressionÍ(¾Í(ÏLªIdentifierÍ(¾Í(É«preferencesLªIdentifierÍ(ÊÍ(Ï¥flushÂÂÂP³ExpressionStatementÍ(àÍ)BW®CallExpressionÍ(àÍ)AR°MemberExpressionÍ(àÍ(ëLªIdentifierÍ(àÍ(æ¦LoggerLªIdentifierÍ(çÍ(ë¤infoÂÂ‘b¯TemplateLiteralÍ(ìÍ)@“LªIdentifierÍ(şÍ)	«currentTimeR°MemberExpressionÍ)Í)$S®ThisExpressionÍ)Í)LªIdentifierÍ)Í)$¬currentIndexÂÂR°MemberExpressionÍ).Í)>S®ThisExpressionÍ).Í)2LªIdentifierÍ)3Í)>«currentTypeÂÂ”c¯TemplateElementÍ(íÍ(üd¿æ’­æ”¾å™¨çŠ¶æ€å·²ä¿å­˜: time=¿æ’­æ”¾å™¨çŠ¶æ€å·²ä¿å­˜: time=Âc¯TemplateElementÍ)
+Í)d§, song=§, song=Âc¯TemplateElementÍ)%Í),d§, type=§, type=Âc¯TemplateElementÍ)?Í)?d  ÃÂ[«CatchClauseÍ)WÍ)£LªIdentifierÍ)^Í)c¥errorM®BlockStatementÍ)eÍ)£‘P³ExpressionStatementÍ)tÍ)˜W®CallExpressionÍ)tÍ)—R°MemberExpressionÍ)tÍ)€LªIdentifierÍ)tÍ)z¦LoggerLªIdentifierÍ){Í)€¥errorÂÂ‘b¯TemplateLiteralÍ)Í)–‘LªIdentifierÍ)Í)”¥error’c¯TemplateElementÍ)‚Í)d½ä¿å­˜æ’­æ”¾å™¨çŠ¶æ€å¤±è´¥: ½ä¿å­˜æ’­æ”¾å™¨çŠ¶æ€å¤±è´¥: Âc¯TemplateElementÍ)•Í)•d  ÃÂÀN°MethodDefinitionÍ)åÍ-ÈÂÂLªIdentifierÍ)ëÍ)ı²restorePlayerState¦methodO²FunctionExpressionÍ)ıÍ-ÈÀÂÂÃ‘LªIdentifierÍ)şÍ*§contextM®BlockStatementÍ*Í-È‘X¬TryStatementÍ*Í-ÁM®BlockStatementÍ*Í-Tœ]³VariableDeclarationÍ*%Í*w‘^²VariableDeclaratorÍ*+Í*vLªIdentifierÍ*+Í*6«preferences\¯AwaitExpressionÍ*9Í*vW®CallExpressionÍ*?Í*vR°MemberExpressionÍ*?Í*]LªIdentifierÍ*?Í*N¯dataPreferencesLªIdentifierÍ*OÍ*]®getPreferencesÂÂ’LªIdentifierÍ*^Í*e§contextT§LiteralÍ*gÍ*u¬player_state®'player_state'Â¥const]³VariableDeclarationÍ*…Í*Á‘^²VariableDeclaratorÍ*‹Í*ÀLªIdentifierÍ*‹Í*–«currentTime\¯AwaitExpressionÍ*™Í*ÀW®CallExpressionÍ*ŸÍ*ÀR°MemberExpressionÍ*ŸÍ*®LªIdentifierÍ*ŸÍ*ª«preferencesLªIdentifierÍ*«Í*®£getÂÂ’T§LiteralÍ*¯Í*¼«currentTime­'currentTime'T§LiteralÍ*¾Í*¿ ¡0Â¥const]³VariableDeclarationÍ*ÏÍ+‘^²VariableDeclaratorÍ*ÕÍ+LªIdentifierÍ*ÕÍ*å°currentSongIndex\¯AwaitExpressionÍ*èÍ+W®CallExpressionÍ*îÍ+R°MemberExpressionÍ*îÍ*ıLªIdentifierÍ*îÍ*ù«preferencesLªIdentifierÍ*úÍ*ı£getÂÂ’T§LiteralÍ*şÍ+°currentSongIndex²'currentSongIndex'T§LiteralÍ+Í+ ¡0Â¥const]³VariableDeclarationÍ+#Í+[‘^²VariableDeclaratorÍ+)Í+ZLªIdentifierÍ+)Í+2©audioType\¯AwaitExpressionÍ+5Í+ZW®CallExpressionÍ+;Í+ZR°MemberExpressionÍ+;Í+JLªIdentifierÍ+;Í+F«preferencesLªIdentifierÍ+GÍ+J£getÂÂ’T§LiteralÍ+KÍ+V©audioType«'audioType'T§LiteralÍ+XÍ+Y¡1Â¥const]³VariableDeclarationÍ+iÍ+Ÿ‘^²VariableDeclaratorÍ+oÍ+LªIdentifierÍ+oÍ+w¨playMode\¯AwaitExpressionÍ+zÍ+W®CallExpressionÍ+€Í+R°MemberExpressionÍ+€Í+LªIdentifierÍ+€Í+‹«preferencesLªIdentifierÍ+ŒÍ+£getÂÂ’T§LiteralÍ+Í+š¨playModeª'playMode'T§LiteralÍ+œÍ+ ¡0Â¥const]³VariableDeclarationÍ+­Í+ï‘^²VariableDeclaratorÍ+³Í+îLªIdentifierÍ+³Í+À­playbackSpeed\¯AwaitExpressionÍ+ÃÍ+îW®CallExpressionÍ+ÉÍ+îR°MemberExpressionÍ+ÉÍ+ØLªIdentifierÍ+ÉÍ+Ô«preferencesLªIdentifierÍ+ÕÍ+Ø£getÂÂ’T§LiteralÍ+ÙÍ+è­playbackSpeed¯'playbackSpeed'T§LiteralÍ+êÍ+í£1.0Â¥constP³ExpressionStatementÍ+ıÍ,"Q´AssignmentExpressionÍ+ıÍ,!¡=R°MemberExpressionÍ+ıÍ,S®ThisExpressionÍ+ıÍ,LªIdentifierÍ,Í,¬currentIndexÂÂLªIdentifierÍ,Í,!°currentSongIndexP³ExpressionStatementÍ,0Í,MQ´AssignmentExpressionÍ,0Í,L¡=R°MemberExpressionÍ,0Í,@S®ThisExpressionÍ,0Í,4LªIdentifierÍ,5Í,@«currentTypeÂÂLªIdentifierÍ,CÍ,L©audioTypeP³ExpressionStatementÍ,[Í,tQ´AssignmentExpressionÍ,[Í,s¡=R°MemberExpressionÍ,[Í,hS®ThisExpressionÍ,[Í,_LªIdentifierÍ,`Í,h¨playModeÂÂLªIdentifierÍ,kÍ,s¨playModeP³ExpressionStatementÍ,‚Í,¥Q´AssignmentExpressionÍ,‚Í,¤¡=R°MemberExpressionÍ,‚Í,”S®ThisExpressionÍ,‚Í,†LªIdentifierÍ,‡Í,”­playbackSpeedÂÂLªIdentifierÍ,—Í,¤­playbackSpeedP³ExpressionStatementÍ,³Í-W®CallExpressionÍ,³Í-R°MemberExpressionÍ,³Í,¾LªIdentifierÍ,³Í,¹¦LoggerLªIdentifierÍ,ºÍ,¾¤infoÂÂ‘b¯TemplateLiteralÍ,¿Í-“LªIdentifierÍ,ÑÍ,Ü«currentTimeLªIdentifierÍ,æÍ,ö°currentSongIndexLªIdentifierÍ- Í-	©audioType”c¯TemplateElementÍ,ÀÍ,Ïd¿æ’­æ”¾å™¨çŠ¶æ€å·²æ¢å¤: time=¿æ’­æ”¾å™¨çŠ¶æ€å·²æ¢å¤: time=Âc¯TemplateElementÍ,İÍ,äd§, song=§, song=Âc¯TemplateElementÍ,÷Í,şd§, type=§, type=Âc¯TemplateElementÍ-
+Í-
+d  ÃÂ\¯ReturnStatementÍ-6Í-ILªIdentifierÍ-=Í-H«currentTime[«CatchClauseÍ-^Í-ÁLªIdentifierÍ-eÍ-j¥errorM®BlockStatementÍ-lÍ-Á’P³ExpressionStatementÍ-{Í-ŸW®CallExpressionÍ-{Í-R°MemberExpressionÍ-{Í-‡LªIdentifierÍ-{Í-¦LoggerLªIdentifierÍ-‚Í-‡¥errorÂÂ‘b¯TemplateLiteralÍ-ˆÍ-‘LªIdentifierÍ-–Í-›¥error’c¯TemplateElementÍ-‰Í-”d½æ¢å¤æ’­æ”¾å™¨çŠ¶æ€å¤±è´¥: ½æ¢å¤æ’­æ”¾å™¨çŠ¶æ€å¤±è´¥: Âc¯TemplateElementÍ-œÍ-œd  ÃÂ\¯ReturnStatementÍ-­Í-¶T§LiteralÍ-´Í-µ ¡0ÀÀ–Ôre•¤type¥start£endªspecifiers¦source±ImportDeclarationÍnÍ‘Ôrf•¤type¥start£end¨imported¥local¯ImportSpecifierÍwÍLªIdentifierÍwÍ¨PlayModeLªIdentifierÍwÍ¨PlayModeT§LiteralÍ‡Íœ³../common/Constantsµ'../common/Constants'e±ImportDeclarationÍŸÍã‘f¯ImportSpecifierÍ¨Í¿LªIdentifierÍ¨Í¿·AudioRendererControllerLªIdentifierÍ¨Í¿·AudioRendererControllerT§LiteralÍÇÍâ¹./AudioRendererController»'./AudioRendererController'e±ImportDeclarationÍåÍ‘f¯ImportSpecifierÍîÍ LªIdentifierÍîÍ ²AVPlayerControllerLªIdentifierÍîÍ ²AVPlayerControllerT§LiteralÍÍ´./AVPlayerController¶'./AVPlayerController'e±ImportDeclarationÍ!ÍJ‘f¯ImportSpecifierÍ*Í0LªIdentifierÍ*Í0¦LoggerLªIdentifierÍ*Í0¦LoggerT§LiteralÍ8ÍI¯../utils/Logger±'../utils/Logger'e±ImportDeclarationÍLÍ‘Ôrg”¤type¥start£end¥local¶ImportDefaultSpecifierÍSÍbLªIdentifierÍSÍb¯dataPreferencesT§LiteralÍhÍ€¶@ohos.data.preferences¸'@ohos.data.preferences'e±ImportDeclarationÍƒÍÆ‘f¯ImportSpecifierÍŒÍŸLªIdentifierÍŒÍŸ³EqualizerControllerLªIdentifierÍŒÍŸ³EqualizerControllerT§LiteralÍ§ÍÅ¼../utils/EqualizerController¾'../utils/EqualizerController'

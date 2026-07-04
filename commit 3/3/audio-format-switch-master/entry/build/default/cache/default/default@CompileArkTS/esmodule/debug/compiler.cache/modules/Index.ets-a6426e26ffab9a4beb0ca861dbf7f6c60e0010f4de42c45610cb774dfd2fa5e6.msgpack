@@ -1,0 +1,807 @@
+Ôr@Ÿªassertions¤code´customTransformCache¬dependencies¢id¤meta±moduleSideEffects¬originalCode±originalSourcemap«resolvedIds®sourcemapChainµsyntheticNamedExportsµtransformDependencies®transformFiles¨cacheAstÔrAÚJhif (!("finalizeConstruction" in ViewPU.prototype)) {
+    Reflect.set(ViewPU.prototype, "finalizeConstruction", () => { });
+}
+import effectKit from "@ohos.effectKit";
+import image from "@ohos.multimedia.image";
+import { Logger } from '../utils/Logger';
+import { ControlAreaComponent } from '../components/ControlAreaComponent';
+import { PlayListComponent } from '../components/PlayListComponent';
+import { songDataList, AudioName, AudioType, DeviceUtil } from '../common/Constants';
+import { ColorTools } from '../utils/ColorTools';
+import { PlayerController } from '../player/PlayerController';
+class Index extends ViewPU {
+    constructor(parent, params, __localStorage, elmtId = -1, paramsLambda = undefined, extraInfo) {
+        super(parent, __localStorage, elmtId, extraInfo);
+        if (typeof paramsLambda === "function") {
+            this.paramsGenerator_ = paramsLambda;
+        }
+        this.songDataList = songDataList;
+        this.__imageColor = new ObservedPropertySimplePU('rgba(0, 0, 2, 1.00)', this, "imageColor");
+        this.__imageLabel = new ObservedPropertyObjectPU(this.songDataList[0].label, this, "imageLabel");
+        this.__currentSongIndex = new ObservedPropertySimplePU(0, this, "currentSongIndex");
+        this.__isShowPlayList = new ObservedPropertySimplePU(false, this, "isShowPlayList");
+        this.__isShowPlayListProvider = new ObservedPropertySimplePU(false, this, "isShowPlayListProvider");
+        this.addProvidedVar("isShowPlayListProvider", this.__isShowPlayListProvider, false);
+        this.__isWearable = new ObservedPropertySimplePU(false, this, "isWearable");
+        this.playerController = new PlayerController();
+        this.setInitiallyProvidedValue(params);
+        this.finalizeConstruction();
+    }
+    setInitiallyProvidedValue(params) {
+        if (params.songDataList !== undefined) {
+            this.songDataList = params.songDataList;
+        }
+        if (params.imageColor !== undefined) {
+            this.imageColor = params.imageColor;
+        }
+        if (params.imageLabel !== undefined) {
+            this.imageLabel = params.imageLabel;
+        }
+        if (params.currentSongIndex !== undefined) {
+            this.currentSongIndex = params.currentSongIndex;
+        }
+        if (params.isShowPlayList !== undefined) {
+            this.isShowPlayList = params.isShowPlayList;
+        }
+        if (params.isShowPlayListProvider !== undefined) {
+            this.isShowPlayListProvider = params.isShowPlayListProvider;
+        }
+        if (params.isWearable !== undefined) {
+            this.isWearable = params.isWearable;
+        }
+        if (params.playerController !== undefined) {
+            this.playerController = params.playerController;
+        }
+    }
+    updateStateVars(params) {
+    }
+    purgeVariableDependenciesOnElmtId(rmElmtId) {
+        this.__imageColor.purgeDependencyOnElmtId(rmElmtId);
+        this.__imageLabel.purgeDependencyOnElmtId(rmElmtId);
+        this.__currentSongIndex.purgeDependencyOnElmtId(rmElmtId);
+        this.__isShowPlayList.purgeDependencyOnElmtId(rmElmtId);
+        this.__isShowPlayListProvider.purgeDependencyOnElmtId(rmElmtId);
+        this.__isWearable.purgeDependencyOnElmtId(rmElmtId);
+    }
+    aboutToBeDeleted() {
+        this.__imageColor.aboutToBeDeleted();
+        this.__imageLabel.aboutToBeDeleted();
+        this.__currentSongIndex.aboutToBeDeleted();
+        this.__isShowPlayList.aboutToBeDeleted();
+        this.__isShowPlayListProvider.aboutToBeDeleted();
+        this.__isWearable.aboutToBeDeleted();
+        SubscriberManager.Get().delete(this.id__());
+        this.aboutToBeDeletedInternal();
+    }
+    get imageColor() {
+        return this.__imageColor.get();
+    }
+    set imageColor(newValue) {
+        this.__imageColor.set(newValue);
+    }
+    get imageLabel() {
+        return this.__imageLabel.get();
+    }
+    set imageLabel(newValue) {
+        this.__imageLabel.set(newValue);
+    }
+    get currentSongIndex() {
+        return this.__currentSongIndex.get();
+    }
+    set currentSongIndex(newValue) {
+        this.__currentSongIndex.set(newValue);
+    }
+    get isShowPlayList() {
+        return this.__isShowPlayList.get();
+    }
+    set isShowPlayList(newValue) {
+        this.__isShowPlayList.set(newValue);
+    }
+    get isShowPlayListProvider() {
+        return this.__isShowPlayListProvider.get();
+    }
+    set isShowPlayListProvider(newValue) {
+        this.__isShowPlayListProvider.set(newValue);
+    }
+    get isWearable() {
+        return this.__isWearable.get();
+    }
+    set isWearable(newValue) {
+        this.__isWearable.set(newValue);
+    }
+    aboutToAppear() {
+        this.isWearable = DeviceUtil.isWearable();
+        // æ‰‹è¡¨ç«¯è·³è¿‡effectKitè°ƒç”¨ï¼Œé¿å…ä¸å…¼å®¹å´©æºƒ
+        if (!this.isWearable) {
+            this.getImageColor();
+        }
+        this.restoreContinuationState();
+    }
+    initialRender() {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Stack.create();
+            Stack.height('100%');
+            Stack.width('100%');
+            Stack.backgroundColor(this.imageColor);
+        }, Stack);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Image.create(this.imageLabel);
+            Image.size({ height: '120%' });
+            Image.aspectRatio(1);
+            Image.objectFit(ImageFit.Cover);
+            Image.opacity(0.5);
+        }, Image);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.height('100%');
+            Column.width('100%');
+            Column.padding(this.isWearable ? {
+                top: 12,
+                left: 12,
+                right: 12,
+                bottom: 12
+            } : {
+                top: 64,
+                left: 24,
+                right: 24,
+                bottom: 24
+            });
+            globalThis.Gesture.create(GesturePriority.Low);
+            GestureGroup.create(GestureMode.Parallel);
+            // å·¦æ»‘ä¸‹ä¸€æ›²
+            PanGesture.create({ direction: PanDirection.Left, distance: 80 });
+            // å·¦æ»‘ä¸‹ä¸€æ›²
+            PanGesture.onActionEnd(() => {
+                this.playNext();
+            });
+            // å·¦æ»‘ä¸‹ä¸€æ›²
+            PanGesture.pop();
+            // å³æ»‘ä¸Šä¸€æ›²
+            PanGesture.create({ direction: PanDirection.Right, distance: 80 });
+            // å³æ»‘ä¸Šä¸€æ›²
+            PanGesture.onActionEnd(() => {
+                this.playPrevious();
+            });
+            // å³æ»‘ä¸Šä¸€æ›²
+            PanGesture.pop();
+            GestureGroup.pop();
+            globalThis.Gesture.pop();
+        }, Column);
+        this.CoverInfo.bind(this)();
+        this.MusicInfo.bind(this)();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Blank.create();
+        }, Blank);
+        Blank.pop();
+        {
+            this.observeComponentCreation2((elmtId, isInitialRender) => {
+                if (isInitialRender) {
+                    let componentCall = new ControlAreaComponent(this, {
+                        songData: this.songDataList[this.currentSongIndex],
+                        imageColor: this.imageColor,
+                        isWearable: this.isWearable
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Index.ets", line: 60, col: 9 });
+                    ViewPU.create(componentCall);
+                    let paramsLambda = () => {
+                        return {
+                            songData: this.songDataList[this.currentSongIndex],
+                            imageColor: this.imageColor,
+                            isWearable: this.isWearable
+                        };
+                    };
+                    componentCall.paramsGenerator_ = paramsLambda;
+                }
+                else {
+                    this.updateStateVarsOfChildByElmtId(elmtId, {
+                        songData: this.songDataList[this.currentSongIndex],
+                        imageColor: this.imageColor,
+                        isWearable: this.isWearable
+                    });
+                }
+            }, { name: "ControlAreaComponent" });
+        }
+        Column.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            If.create();
+            // æ’­æ”¾åˆ—è¡¨å¼¹çª—
+            if (this.isShowPlayList) {
+                this.ifElseBranchUpdateFunction(0, () => {
+                    this.observeComponentCreation2((elmtId, isInitialRender) => {
+                        __Common__.create();
+                        globalThis.Context.animation({
+                            duration: 300
+                        });
+                        __Common__.position({ x: 0, y: '100%' });
+                        __Common__.translate({ y: this.isShowPlayList ? '-100%' : '0%' });
+                        globalThis.Context.animation(null);
+                    }, __Common__);
+                    {
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            if (isInitialRender) {
+                                let componentCall = new PlayListComponent(this, {
+                                    songList: this.songDataList,
+                                    currentIndex: this.currentSongIndex,
+                                    playMode: this.playerController.getPlayMode(),
+                                    imageColor: this.imageColor,
+                                    onSongSelect: (index) => {
+                                        this.switchSong(index);
+                                    }
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Index.ets", line: 96, col: 9 });
+                                ViewPU.create(componentCall);
+                                let paramsLambda = () => {
+                                    return {
+                                        songList: this.songDataList,
+                                        currentIndex: this.currentSongIndex,
+                                        playMode: this.playerController.getPlayMode(),
+                                        imageColor: this.imageColor,
+                                        onSongSelect: (index) => {
+                                            this.switchSong(index);
+                                        }
+                                    };
+                                };
+                                componentCall.paramsGenerator_ = paramsLambda;
+                            }
+                            else {
+                                this.updateStateVarsOfChildByElmtId(elmtId, {
+                                    songList: this.songDataList,
+                                    currentIndex: this.currentSongIndex,
+                                    playMode: this.playerController.getPlayMode(),
+                                    imageColor: this.imageColor
+                                });
+                            }
+                        }, { name: "PlayListComponent" });
+                    }
+                    __Common__.pop();
+                });
+            }
+            else {
+                this.ifElseBranchUpdateFunction(1, () => {
+                });
+            }
+        }, If);
+        If.pop();
+        Stack.pop();
+    }
+    CoverInfo(parent = null) {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create();
+            Row.height(this.isWearable ? '30%' : '40%');
+        }, Row);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Image.create(this.songDataList[this.currentSongIndex].label);
+            Image.height('100%');
+            Image.aspectRatio(1);
+            Image.borderRadius(this.isWearable ? 4 : 8);
+            Image.shadow(this.isWearable ? {
+                radius: 6,
+                color: '#66000000',
+                offsetX: 0,
+                offsetY: 4
+            } : {
+                radius: 12,
+                color: '#66000000',
+                offsetX: 0,
+                offsetY: 8
+            });
+            Image.margin(3);
+        }, Image);
+        Row.pop();
+    }
+    // åˆ‡æ¢æ­Œæ›²
+    switchSong(index) {
+        this.currentSongIndex = index;
+        this.getImageColor();
+        // é€šçŸ¥æ’­æ”¾å™¨åˆ‡æ¢æ­Œæ›²
+        const song = this.songDataList[index];
+        this.getUIContext().getHostContext()?.resourceManager.getRawFd(song.src + AudioName.MP3)
+            .then((rawFileDescriptor) => {
+            this.playerController.switchSong(index, rawFileDescriptor, AudioType.MP3);
+        })
+            .catch((error) => {
+            Logger.error(`Switch song error: ${error.code}, message: ${error.message}`);
+        });
+    }
+    // ä¸Šä¸€æ›²
+    playPrevious() {
+        try {
+            const currentIndex = this.playerController.getCurrentIndex();
+            const newIndex = this.playerController.previousSong(this.getUIContext().getHostContext().resourceManager.getRawFdSync(this.songDataList[currentIndex].src + AudioName.MP3), AudioType.MP3);
+            this.switchSong(newIndex);
+        }
+        catch (error) {
+            Logger.error(`playPrevious error: ${error}`);
+        }
+    }
+    // ä¸‹ä¸€æ›²
+    playNext() {
+        try {
+            const currentIndex = this.playerController.getCurrentIndex();
+            const newIndex = this.playerController.nextSong(this.getUIContext().getHostContext().resourceManager.getRawFdSync(this.songDataList[currentIndex].src + AudioName.MP3), AudioType.MP3);
+            this.switchSong(newIndex);
+        }
+        catch (error) {
+            Logger.error(`playNext error: ${error}`);
+        }
+    }
+    MusicInfo(parent = null) {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.margin({ top: this.isWearable ? 8 : 24 });
+        }, Column);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Flex.create({ justifyContent: FlexAlign.SpaceBetween, alignItems: ItemAlign.Center });
+        }, Flex);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Text.create(this.songDataList[this.currentSongIndex].title);
+            Text.fontSize(this.isWearable ? 14 : 20);
+            Text.fontColor(Color.White);
+            Text.opacity(0.86);
+            Text.fontWeight(FontWeight.Bold);
+            Text.fontFamily(this.isWearable ? '' : 'HarmonyHeiTi-Bold');
+            Text.maxLines(1);
+            Text.textOverflow({ overflow: TextOverflow.Ellipsis });
+        }, Text);
+        Text.pop();
+        Flex.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Text.create(this.songDataList[this.currentSongIndex].singer);
+            Text.textAlign(TextAlign.Start);
+            Text.fontSize(this.isWearable ? 11 : 14);
+            Text.fontColor('#99FFFFFF');
+            Text.fontFamily(this.isWearable ? '' : 'HarmonyHeiTi');
+            Text.width('100%');
+            Text.fontWeight(FontWeight.Regular);
+            Text.maxLines(1);
+            Text.textOverflow({ overflow: TextOverflow.Ellipsis });
+        }, Text);
+        Text.pop();
+        Column.pop();
+    }
+    getImageColor() {
+        try {
+            this.getUIContext().getHostContext().resourceManager.getMediaContent(this.songDataList[0].label.id)
+                .then((value) => {
+                let buffer = value.buffer;
+                let imageSource = image.createImageSource(buffer);
+                let currentPixelMap = undefined;
+                imageSource.createPixelMap().then((pixelMap) => {
+                    effectKit.createColorPicker(pixelMap, (error, colorPicker) => {
+                        if (error) {
+                            Logger.error(`Failed to create color picker. Error: ${error.code}, message: ${error.message}`);
+                        }
+                        else {
+                            currentPixelMap = pixelMap;
+                            let color = colorPicker.getLargestProportionColor();
+                            let colorArr = ColorTools.dealColor(color.red, color.green, color.blue);
+                            this.imageColor = `rgba(${colorArr[0]}, ${colorArr[1]}, ${colorArr[2]}, 1)`;
+                        }
+                    });
+                    let headFilter = effectKit.createEffect(pixelMap);
+                    if (headFilter !== null) {
+                        headFilter.blur(15);
+                        headFilter.getEffectPixelMap().then((value) => {
+                            this.imageLabel = value;
+                        });
+                    }
+                })
+                    .finally(() => {
+                    imageSource?.release();
+                    currentPixelMap?.release();
+                })
+                    .catch((error) => {
+                    Logger.error(`createPixelMap error: ${error.code}, message: ${error.message}`);
+                });
+            })
+                .catch((error) => {
+                Logger.error(`getMediaContent error: ${error.code}, message: ${error.message}`);
+            });
+        }
+        catch (error) {
+            Logger.error(`getImageColor error: ${error}`);
+        }
+    }
+    /**
+     * æ¢å¤æµè½¬çŠ¶æ€
+     */
+    async restoreContinuationState() {
+        try {
+            const context = this.getUIContext().getHostContext();
+            if (!context)
+                return;
+            // æ¢å¤æ’­æ”¾å™¨çŠ¶æ€
+            const restoredTime = await this.playerController.restorePlayerState(context);
+            // å¦‚æžœæœ‰ä¿å­˜çš„æ’­æ”¾è¿›åº¦ï¼Œè·³è½¬åˆ°è¯¥ä½ç½®
+            if (restoredTime > 0) {
+                Logger.info(`æµè½¬åˆ°è®¾å¤‡ï¼Œæ¢å¤åˆ° ${restoredTime}ms`);
+                // å»¶è¿Ÿä¸€ä¸‹å†è·³è½¬ï¼Œç­‰å¾…æ’­æ”¾å™¨åˆå§‹åŒ–å®Œæˆ
+                setTimeout(() => {
+                    this.playerController.seek(restoredTime);
+                }, 500);
+            }
+        }
+        catch (error) {
+            Logger.error(`æ¢å¤æµè½¬çŠ¶æ€å¤±è´¥: ${error}`);
+        }
+    }
+    rerender() {
+        this.updateDirtyElements();
+    }
+    static getEntryName() {
+        return "Index";
+    }
+}
+registerNamedRoute(() => new Index(undefined, {}), "", { bundleName: "com.sample.AudioFormatSwitch", moduleName: "entry", pagePath: "pages/Index", pageFullPath: "entry/src/main/ets/pages/Index", integratedHsp: "false", moduleType: "followWithHap" });
+//# sourceMappingURL=Index.js.mapÂ˜ÙT hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.effectKit.d.tsÙ[ hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.multimedia.image.d.tsÙ\D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\utils\Logger.etsÙoD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\components\ControlAreaComponent.etsÙlD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\components\PlayListComponent.etsÙ`D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\common\Constants.etsÙ`D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\utils\ColorTools.etsÙgD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\player\PlayerController.etsÙ[D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\pages\Index.etsÔrBšªmoduleName±isLocalDependency¯isNodeEntryFile§pkgPath±belongProjectPath§pkgNameªpkgVersion±dependencyPkgInfo°belongModulePath¬shouldEmitJs¥entryÃÂÙ>D:\audio-format-switch-master\audio-format-switch-master\entryÙ8D:\audio-format-switch-master\audio-format-switch-master¥entry¥1.0.0Ô  Ù>D:\audio-format-switch-master\audio-format-switch-master\entryÃÃÚ#ô/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { BusinessError } from '@kit.BasicServicesKit';
+import { effectKit } from '@kit.ArkGraphics2D';
+import { image } from '@kit.ImageKit';
+import { Logger } from '../utils/Logger';
+import { SongData } from '../model/SongData';
+import { ControlAreaComponent } from '../components/ControlAreaComponent';
+import { PlayListComponent } from '../components/PlayListComponent';
+import { songDataList, AudioName, AudioType, PlayMode, DeviceUtil } from '../common/Constants';
+import { ColorTools } from '../utils/ColorTools';
+import { PlayerController } from '../player/PlayerController';
+
+@Entry
+@Component
+struct Index {
+  private songDataList: SongData[] = songDataList;
+  @State imageColor: string = 'rgba(0, 0, 2, 1.00)';
+  @State imageLabel: PixelMap | Resource = this.songDataList[0].label;
+  @State currentSongIndex: number = 0;
+  @State isShowPlayList: boolean = false;
+  @Provide isShowPlayListProvider: boolean = false;
+  @State isWearable: boolean = false;
+  private playerController: PlayerController = new PlayerController();
+
+  aboutToAppear(): void {
+    this.isWearable = DeviceUtil.isWearable();
+    // æ‰‹è¡¨ç«¯è·³è¿‡effectKitè°ƒç”¨ï¼Œé¿å…ä¸å…¼å®¹å´©æºƒ
+    if (!this.isWearable) {
+      this.getImageColor();
+    }
+    this.restoreContinuationState();
+  }
+
+  build() {
+    Stack() {
+      Image(this.imageLabel)
+        .size({ height: '120%' })
+        .aspectRatio(1)
+        .objectFit(ImageFit.Cover)
+        .opacity(0.5)
+
+      Column() {
+        this.CoverInfo()
+        this.MusicInfo()
+        Blank()
+        ControlAreaComponent({ 
+          songData: this.songDataList[this.currentSongIndex], 
+          imageColor: this.imageColor,
+          isWearable: this.isWearable
+        })
+      }
+      .height('100%')
+      .width('100%')
+      .padding(this.isWearable ? {
+        top: 12,
+        left: 12,
+        right: 12,
+        bottom: 12
+      } : {
+        top: 64,
+        left: 24,
+        right: 24,
+        bottom: 24
+      })
+      .gesture(
+        GestureGroup(GestureMode.Parallel,
+          // å·¦æ»‘ä¸‹ä¸€æ›²
+          PanGesture({ direction: PanDirection.Left, distance: 80 })
+            .onActionEnd(() => {
+              this.playNext();
+            }),
+          // å³æ»‘ä¸Šä¸€æ›²
+          PanGesture({ direction: PanDirection.Right, distance: 80 })
+            .onActionEnd(() => {
+              this.playPrevious();
+            })
+        )
+      )
+
+      // æ’­æ”¾åˆ—è¡¨å¼¹çª—
+      if (this.isShowPlayList) {
+        PlayListComponent({
+          songList: this.songDataList,
+          currentIndex: this.currentSongIndex,
+          playMode: this.playerController.getPlayMode(),
+          imageColor: this.imageColor,
+          onSongSelect: (index: number) => {
+            this.switchSong(index);
+          }
+        })
+          .position({ x: 0, y: '100%' })
+          .translate({ y: this.isShowPlayList ? '-100%' : '0%' })
+          .animation({
+            duration: 300
+          })
+      }
+    }
+    .height('100%')
+    .width('100%')
+    .backgroundColor(this.imageColor)
+  }
+
+  @Builder
+  CoverInfo() {
+    Row() {
+      Image(this.songDataList[this.currentSongIndex].label)
+        .height('100%')
+        .aspectRatio(1)
+        .borderRadius(this.isWearable ? 4 : 8)
+        .shadow(this.isWearable ? {
+          radius: 6,
+          color: '#66000000',
+          offsetX: 0,
+          offsetY: 4
+        } : {
+          radius: 12,
+          color: '#66000000',
+          offsetX: 0,
+          offsetY: 8
+        })
+        .margin(3)
+    }
+    .height(this.isWearable ? '30%' : '40%')
+  }
+
+  // åˆ‡æ¢æ­Œæ›²
+  private switchSong(index: number): void {
+    this.currentSongIndex = index;
+    this.getImageColor();
+    
+    // é€šçŸ¥æ’­æ”¾å™¨åˆ‡æ¢æ­Œæ›²
+    const song = this.songDataList[index];
+    this.getUIContext().getHostContext()?.resourceManager.getRawFd(song.src + AudioName.MP3)
+      .then((rawFileDescriptor) => {
+        this.playerController.switchSong(index, rawFileDescriptor, AudioType.MP3);
+      })
+      .catch((error: BusinessError) => {
+        Logger.error(`Switch song error: ${error.code}, message: ${error.message}`);
+      });
+  }
+
+  // ä¸Šä¸€æ›²
+  private playPrevious(): void {
+    try {
+      const currentIndex = this.playerController.getCurrentIndex();
+      const newIndex = this.playerController.previousSong(
+        this.getUIContext().getHostContext()!.resourceManager.getRawFdSync(
+          this.songDataList[currentIndex].src + AudioName.MP3
+        ),
+        AudioType.MP3
+      );
+      this.switchSong(newIndex);
+    } catch (error) {
+      Logger.error(`playPrevious error: ${error}`);
+    }
+  }
+
+  // ä¸‹ä¸€æ›²
+  private playNext(): void {
+    try {
+      const currentIndex = this.playerController.getCurrentIndex();
+      const newIndex = this.playerController.nextSong(
+        this.getUIContext().getHostContext()!.resourceManager.getRawFdSync(
+          this.songDataList[currentIndex].src + AudioName.MP3
+        ),
+        AudioType.MP3
+      );
+      this.switchSong(newIndex);
+    } catch (error) {
+      Logger.error(`playNext error: ${error}`);
+    }
+  }
+
+  @Builder
+  MusicInfo() {
+    Column() {
+      Flex({ justifyContent: FlexAlign.SpaceBetween, alignItems: ItemAlign.Center }) {
+        Text(this.songDataList[this.currentSongIndex].title)
+          .fontSize(this.isWearable ? 14 : 20)
+          .fontColor(Color.White)
+          .opacity(0.86)
+          .fontWeight(FontWeight.Bold)
+          .fontFamily(this.isWearable ? '' : 'HarmonyHeiTi-Bold')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+
+      Text(this.songDataList[this.currentSongIndex].singer)
+        .textAlign(TextAlign.Start)
+        .fontSize(this.isWearable ? 11 : 14)
+        .fontColor('#99FFFFFF')
+        .fontFamily(this.isWearable ? '' : 'HarmonyHeiTi')
+        .width('100%')
+        .fontWeight(FontWeight.Regular)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .margin({ top: this.isWearable ? 8 : 24 })
+  }
+
+  getImageColor() {
+    try {
+      this.getUIContext().getHostContext()!.resourceManager.getMediaContent(this.songDataList[0].label.id)
+        .then((value: Uint8Array) => {
+          let buffer = value.buffer as ArrayBuffer;
+          let imageSource: image.ImageSource = image.createImageSource(buffer);
+          let currentPixelMap: image.PixelMap | undefined = undefined;
+          imageSource.createPixelMap().then((pixelMap) => {
+            effectKit.createColorPicker(pixelMap, (error, colorPicker) => {
+              if (error) {
+                Logger.error(`Failed to create color picker. Error: ${error.code}, message: ${error.message}`);
+              } else {
+                currentPixelMap = pixelMap;
+                let color: effectKit.Color = colorPicker.getLargestProportionColor();
+                let colorArr: number[] = ColorTools.dealColor(color.red, color.green, color.blue);
+                this.imageColor = `rgba(${colorArr[0]}, ${colorArr[1]}, ${colorArr[2]}, 1)`;
+              }
+            })
+            let headFilter = effectKit.createEffect(pixelMap);
+            if (headFilter !== null) {
+              headFilter.blur(15);
+              headFilter.getEffectPixelMap().then((value) => {
+                this.imageLabel = value;
+              })
+            }
+          })
+            .finally(() => {
+              imageSource?.release();
+              currentPixelMap?.release();
+            })
+            .catch((error: BusinessError) => {
+              Logger.error(`createPixelMap error: ${error.code}, message: ${error.message}`);
+            })
+        })
+        .catch((error: BusinessError) => {
+          Logger.error(`getMediaContent error: ${error.code}, message: ${error.message}`);
+        })
+    } catch (error) {
+      Logger.error(`getImageColor error: ${error}`);
+    }
+  }
+  
+  /**
+   * æ¢å¤æµè½¬çŠ¶æ€
+   */
+  private async restoreContinuationState(): Promise<void> {
+    try {
+      const context = this.getUIContext().getHostContext();
+      if (!context) return;
+      
+      // æ¢å¤æ’­æ”¾å™¨çŠ¶æ€
+      const restoredTime = await this.playerController.restorePlayerState(context);
+      
+      // å¦‚æžœæœ‰ä¿å­˜çš„æ’­æ”¾è¿›åº¦ï¼Œè·³è½¬åˆ°è¯¥ä½ç½®
+      if (restoredTime > 0) {
+        Logger.info(`æµè½¬åˆ°è®¾å¤‡ï¼Œæ¢å¤åˆ° ${restoredTime}ms`);
+        // å»¶è¿Ÿä¸€ä¸‹å†è·³è½¬ï¼Œç­‰å¾…æ’­æ”¾å™¨åˆå§‹åŒ–å®Œæˆ
+        setTimeout(() => {
+          this.playerController.seek(restoredTime);
+        }, 500);
+      }
+    } catch (error) {
+      Logger.error(`æ¢å¤æµè½¬çŠ¶æ€å¤±è´¥: ${error}`);
+    }
+  }
+}ÀÔrC˜¯@ohos.effectKit¶@ohos.multimedia.image¯../utils/Logger³../common/ConstantsÙ"../components/ControlAreaComponent¿../components/PlayListComponent³../utils/ColorToolsº../player/PlayerControllerÔrD—ªassertions¨external¢id¤meta±moduleSideEffectsªresolvedByµsyntheticNamedExportsAÃÙT hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.effectKit.d.tsÔrE‘¯hostModulesInfo‘ÔrF’²hostDependencyName®hostModuleName¯@ohos.effectKit¥entryÃªoh-resolveÂDAÃÙ[ hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.multimedia.image.d.tsE’F¶@ohos.multimedia.image¥entryF¶@ohos.multimedia.image¥entryÃªoh-resolveÂDAÂÙ\D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\utils\Logger.etsAÃªoh-resolveÂDAÂÙ`D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\common\Constants.etsAÃªoh-resolveÂDAÂÙoD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\components\ControlAreaComponent.etsAÃªoh-resolveÂDAÂÙlD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\components\PlayListComponent.etsAÃªoh-resolveÂDAÂÙ`D:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\utils\ColorTools.etsAÃªoh-resolveÂDAÂÙgD:\audio-format-switch-master\audio-format-switch-master\entry\src\main\ets\player\PlayerController.etsAÃªoh-resolveÂ“ÔrG–§version¤fileªsourceRoot§sources¥names¨mappings¨Index.js ‘©Index.etsÜ©–”   ” 	” ” ”' .”( /–”   ” 	” ” ”* %”+ &˜”   ” ”	 	” ” ” ”( (”) )˜”   ” ”	 	” ” ”% %”ÌI ÌI”ÌJ ÌJ˜”   ” ”	 	” ” ”" "”ÌC ÌC”ÌD ÌDž”   ” ”	 	” ” ”   ”" "”+ +”- 7”7 ÌA”9 ÌC”? ÌI”ÌT Ì^”ÌU Ì_˜”   ” ”	 	” ” ” ”0 0”1 1˜”   ” ”	 	” ” ”! !”= =”> >’” ” ‘”  ’” %”( 1’”9 ”ÌN 3™”9 +”= /”> 0”ÌJ <”ÌK =”ÌL >”ÌM ?”ÌN Ì@”ÌS ÌE’”?  $”Ì@  %’”= !#”ÌB !(’”ÌE "-”ÌJ "2’”9 #”> #$””  $/”$ $3”4 $ÌC”6 $ÌE‘” >’” 	” ’” 	” ’” 	” ’” 	” ’”  	”  ’”  	”  ’” !	” !’” !	” !’” "” "!’” "” "!’” #	” #’” #	” #’” &” &š” '” '” '	” '” '”$ ' ”% '!”/ '+”1 '-”2 '.’” (”# (—” )” )” )	” )” )” )” )–” *” *
+” *” *”  *”! *‘”	 +–” ,” ,” ,	”% ,!”' ,#”( ,$’” -” -‘” /’” 0” 0	–” 0” 0	” Ìo” Ìo” Ìo” Ìo–” 0” 0	” Ìp” Ìp
+” Ìp” Ìp˜” 0” 0	” Ìq”! Ìq”" Ìq”& Ìq”' Ìq”1 Ìq$–” 1” 1” 1” 1” 1”( 1š” 1” 1” 2	” 2” 2” 2” 2”! 2”' 2”) 2 –” 1” 1” 3	” 3” 3” 3˜” 1” 1” 4	” 4” 4”$ 4”% 4”* 4!–” 1” 1” 5	” 5” 5” 5’” 7” 7–” 7” 7” ÌA” ÌA” ÌA”  ÌA–” 7” 7” ÌB” ÌB” ÌB” ÌB›” 7” 7” ÌC” ÌC” ÌC” ÌC”  ÌC”* ÌC”+ ÌC”, ÌC ”- ÌC!”” ÌD” ÌD” ÌD” ÌD”” ÌE” ÌE” ÌE” ÌE”” ÌF” ÌF” ÌF” ÌF”” ÌG” ÌG” ÌG” ÌG”” ÌH” ÌH” ÌH	” ÌH
+”” ÌI” ÌI” ÌI” ÌI”” ÌJ” ÌJ” ÌJ” ÌJ”” ÌK” ÌK” ÌK” ÌK”” ÌL” ÌL” ÌL” ÌL‘” ÌM–” ÌO” ÌO”  ÌO”+ ÌO ”, ÌO!”4 ÌO)’” ÌP
+” ÌPž” ÌQ
+” ÌQ” ÌQ”  ÌQ”) ÌQ ”+ ÌQ"”7 ÌQ.”8 ÌQ/”< ÌQ3”> ÌQ5”ÌF ÌQ=”ÌH ÌQ?”ÌJ ÌQÌA”ÌL ÌQÌC’” ÌP
+” ÌP—” ÌQ
+” ÌQ” ÌR”" ÌR”# ÌR”& ÌR”( ÌR–” ÌS” ÌS” ÌS” ÌS” ÌS”  ÌS’” ÌT” ÌT’” ÌP
+” ÌP’” ÌQ
+” ÌQ’” ÌU
+” ÌUž” ÌV
+” ÌV” ÌV”  ÌV”) ÌV ”+ ÌV"”7 ÌV.”8 ÌV/”= ÌV4”? ÌV6”ÌG ÌV>”ÌI ÌVÌ@”ÌK ÌVÌB”ÌM ÌVÌD’” ÌU
+” ÌU—” ÌV
+” ÌV” ÌW”" ÌW”# ÌW”& ÌW”( ÌW–” ÌX” ÌX” ÌX”! ÌX”# ÌX!”$ ÌX"’” ÌY” ÌY’” ÌU
+” ÌU’” ÌV
+” ÌV’” ÌO” ÌO•” 8” 8” 8” 8”# 8•” 9” 9” 9” 9”# 9’” :” :’” :” :“”, ;”Ì@ ;”ÌG ;›” <
+”  <”" <”& <”' <”3 <%”4 <&”8 <*”9 <+”ÌI <;”ÌJ <<–” =
+”" =”$ =”( =”) =”3 =%–” >
+”" >”$ >”( >”) >”3 >%‘” ?	›” <
+”$ <”& <”* <”+ <”7 <%”8 <&”< <*”= <+”ÌM <;”ÌN <<–” =
+”& =”( =”, =”- =”7 =%–” >
+”& >”( >”, >”- >”7 >%›” <
+”  <”" <”& <”' <”3 <%”4 <&”8 <*”9 <+”ÌI <;”ÌJ <<–” =
+”" =”$ =”( =”) =”3 =%–” >
+”" >”$ >”( >”) >”3 >%’” 7” 7’” Ì]” Ì]–” Ì^” Ì^
+” Ì^” Ì^”# Ì^”% Ì^“”+ Ìj”4 Ìj”5 Ìj”” Ìk”$ Ìk”& Ìk”) Ìk‘” Ìlœ”# Ìh”+ Ìh”, Ìh”. Ìh”/ Ìh”1 Ìh”2 Ìh”4 Ìh”5 Ìh”7 Ìh”= Ìh%”? Ìh'Ü ”# Ìi”, Ìi”- Ìi”/ Ìi”0 Ìi”2 Ìi”6 Ìi”7 Ìi”ÌE Ìi-”ÌF Ìi.”ÌG Ìi/”ÌH Ìi0”ÌO Ìi7”ÌP Ìi8”ÌQ Ìi9”ÌR Ìi:”ÌV Ìi>”ÌX ÌiÌ@’”+ Ìj”4 Ìj“”8 Ì_”ÌI Ì_”ÌP Ì_–”$ Ì`
+”, Ì`”. Ì`”2 Ì`”3 Ì`”? Ì`%–”$ Ìa
+”0 Ìa”2 Ìa”6 Ìa”7 Ìa”ÌG Ìa-™”$ Ìb
+”, Ìb”. Ìb”2 Ìb”3 Ìb”ÌC Ìb)”ÌD Ìb*”ÌO Ìb5”ÌQ Ìb7–”$ Ìc
+”. Ìc”0 Ìc”4 Ìc”5 Ìc”? Ìc%—”$ Ìd
+”0 Ìd”2 Ìd”3 Ìd”8 Ìd&”: Ìd(”< Ìd*˜”( Ìe”, Ìe”- Ìe”7 Ìe”8 Ìe”= Ìe!”> Ìe"”? Ìe#’”$ Ìf
+”% Ìf‘”! Ìg	–”( Ì`
+”0 Ì`”2 Ì`”6 Ì`”7 Ì`”ÌC Ì`%–”( Ìa
+”4 Ìa”6 Ìa”: Ìa”; Ìa”ÌK Ìa-™”( Ìb
+”0 Ìb”2 Ìb”6 Ìb”7 Ìb”ÌG Ìb)”ÌH Ìb*”ÌS Ìb5”ÌU Ìb7–”( Ìc
+”2 Ìc”4 Ìc”8 Ìc”9 Ìc”ÌC Ìc%—”( Ìd
+”4 Ìd”6 Ìd”7 Ìd”< Ìd&”> Ìd(”Ì@ Ìd*˜”, Ìe”0 Ìe”1 Ìe”; Ìe”< Ìe”ÌA Ìe!”ÌB Ìe"”ÌC Ìe#’”( Ìf
+”) Ìf–”$ Ì`
+”, Ì`”. Ì`”2 Ì`”3 Ì`”? Ì`%–”$ Ìa
+”0 Ìa”2 Ìa”6 Ìa”7 Ìa”ÌG Ìa-™”$ Ìb
+”, Ìb”. Ìb”2 Ìb”3 Ìb”ÌC Ìb)”ÌD Ìb*”ÌO Ìb5”ÌQ Ìb7–”$ Ìc
+”. Ìc”0 Ìc”4 Ìc”5 Ìc”? Ìc%‘” Ìm‘” Ìm’” 0” 0	‘” Ìr’” Ìu” Ìu’” Ìv” ÌvÜ ” Ìv” Ìv” Ìˆ” Ìˆ” Ìˆ” Ìˆ” Ìˆ”& Ìˆ”' Ìˆ”( Ìˆ”) Ìˆ”. Ìˆ#”/ Ìˆ$”0 Ìˆ%”1 Ìˆ&”6 Ìˆ+” Ìw” Ìw” Ìw” Ìw” Ìw”* Ìw”+ Ìw”/ Ìw"”0 Ìw#”Ì@ Ìw3”ÌA Ìw4”ÌB Ìw5”ÌG Ìw:–” Ìw” Ìw” Ìx	” Ìx” Ìx” Ìx–” Ìw” Ìw” Ìy	” Ìy” Ìy” ÌyÜ ” Ìw” Ìw” Ìz	” Ìz” Ìz”# Ìz”$ Ìz”. Ìz%”/ Ìz&”0 Ìz'”1 Ìz(”2 Ìz)”3 Ìz*”4 Ìz+”5 Ìz,”6 Ìz-›” Ìw” Ìw” Ì{	” Ì{” Ì{” Ì{” Ì{”( Ì{”) Ì{ ”* Ì{!”+ Ì{"”” Ì|
+” Ì|” Ì|” Ì|”” Ì}
+” Ì}” Ì}”" Ì}”” Ì~
+” Ì~” Ì~” Ì~”” Ì
+” Ì” Ì” Ì”” Ì€	” Ì€
+” Ì€” Ì€”” Ì
+” Ì” Ì” Ì”” Ì‚
+” Ì‚” Ì‚”" Ì‚”” Ìƒ
+” Ìƒ” Ìƒ” Ìƒ”” Ì„
+” Ì„” Ì„” Ì„‘” Ì…	–” Ìw” Ìw” Ì†	” Ì†” Ì†” Ì†’” Ìv” Ìv‘” Ì‰’” Ì‹” Ì‹	”” ÌŒ
+” ÌŒ” ÌŒ” ÌŒ"—” Ì” Ì” Ì	” Ì”  Ì”% Ì!”& Ì"–” ÌŽ” ÌŽ” ÌŽ	” ÌŽ” ÌŽ” ÌŽ’” Ì” Ì›” Ì‘” Ì‘
+” Ì‘” Ì‘” Ì‘” Ì‘”& Ì‘"”' Ì‘#”, Ì‘(”- Ì‘)”. Ì‘*Ü ” Ì’” Ì’” Ì’	” Ì’” Ì’” Ì’”* Ì’&”, Ì’(”. Ì’*”= Ì’9”> Ì’:”ÌF Ì’ÌB”ÌG Ì’ÌC”ÌK Ì’ÌG”ÌL Ì’ÌH”ÌO Ì’ÌK”ÌR Ì’ÌN”Ì[ Ì’ÌW”Ì\ Ì’ÌX”Ì_ Ì’Ì[”Ì` Ì’Ì\—” Ì“” Ì“” Ì“” Ì“”$ Ì“”& Ì“ ”( Ì“"Ü ” Ì”” Ì”” Ì””! Ì””" Ì””, Ì”(”- Ì”)”2 Ì”.”4 Ì”0”ÌE Ì”ÌA”ÌG Ì”ÌC”ÌP Ì”ÌL”ÌQ Ì”ÌM”ÌT Ì”ÌP”ÌU Ì”ÌQ”ÌV Ì”ÌR“” Ì•”	 Ì•”
+ Ì•—” Ì–” Ì–” Ì–” Ì–” Ì–"” Ì–$” Ì–&Ü ” Ì—” Ì—” Ì—” Ì—” Ì—”/ Ì—+”4 Ì—0”5 Ì—1”9 Ì—5”ÌG Ì—ÌC”ÌL Ì—ÌH”ÌM Ì—ÌI”ÌT Ì—ÌP”ÌV Ì—ÌR”ÌW Ì—ÌS”ÌX Ì—ÌT”” Ì˜”	 Ì˜”
+ Ì˜” Ì˜	’” Ì™” Ì™’” Ì›”
+ Ì›’” Ìœ
+” Ìœ’” Ì” Ì›” Ìž” Ìž” Ìž”! Ìž”% Ìž”& Ìž ”6 Ìž0”7 Ìž1”ÌF ÌžÌ@”ÌH ÌžÌB”ÌI ÌžÌCÜ )” ÌŸ” ÌŸ” ÌŸ” ÌŸ”! ÌŸ”" ÌŸ”2 ÌŸ,”3 ÌŸ-”? ÌŸ9”Ì@ Ì ”ÌD Ì ”ÌE Ì ”ÌQ Ì ”ÌS Ì ”ÌT Ì ”Ìb Ì *”Ìd Ì -”Ìe Ì .”Ìt Ì =”Ìu Ì >”Ì Ì ÌJ”Ì‚ Ì¡
+”Ì† Ì¡”Ì‡ Ì¡”Ì“ Ì¡”Ì” Ì¡”Ì  Ì¡(”Ì¡ Ì¡)”Ì¢ Ì¡*”Ì¥ Ì¡-”Ì¨ Ì¡0”Ì± Ì¡9”Ì² Ì¡:”Ìµ Ì¡=”Ì¶ Ì¢	”Ì¸ Ì£”ÌÁ Ì£”ÌÂ Ì£”ÌÅ Ì£”ÌÆ Ì¤”ÌÇ Ì¤˜” Ì¥” Ì¥
+” Ì¥” Ì¥” Ì¥”$ Ì¥”% Ì¥”& Ì¥ ‘”	 Ì¦”” Ì¦” Ì¦” Ì¦” Ì¦š” Ì§” Ì§” Ì§” Ì§” Ì§”0 Ì§*”5 Ì§/”7 Ì§1”8 Ì§2”9 Ì§3‘”	 Ì¨’” Ì©” Ì©’” Ì«”
+ Ì«’” Ì¬
+” Ì¬’” Ì­” Ì­›” Ì®” Ì®” Ì®”! Ì®”% Ì®”& Ì® ”6 Ì®0”7 Ì®1”ÌF Ì®Ì@”ÌH Ì®ÌB”ÌI Ì®ÌCÜ )” Ì¯” Ì¯” Ì¯” Ì¯”! Ì¯”" Ì¯”2 Ì¯,”3 Ì¯-”; Ì¯5”< Ì°”Ì@ Ì°”ÌA Ì°”ÌM Ì°”ÌO Ì°”ÌP Ì°”Ì^ Ì°*”Ì` Ì°-”Ìa Ì°.”Ìp Ì°=”Ìq Ì°>”Ì} Ì°ÌJ”Ì~ Ì±
+”Ì‚ Ì±”Ìƒ Ì±”Ì Ì±”Ì Ì±”Ìœ Ì±(”Ì Ì±)”Ìž Ì±*”Ì¡ Ì±-”Ì¤ Ì±0”Ì­ Ì±9”Ì® Ì±:”Ì± Ì±=”Ì² Ì²	”Ì´ Ì³”Ì½ Ì³”Ì¾ Ì³”ÌÁ Ì³”ÌÂ Ì´”ÌÃ Ì´˜” Ìµ” Ìµ
+” Ìµ” Ìµ” Ìµ”$ Ìµ”% Ìµ”& Ìµ ‘”	 Ì¶”” Ì¶” Ì¶” Ì¶” Ì¶š” Ì·” Ì·” Ì·” Ì·” Ì·”, Ì·&”1 Ì·+”3 Ì·-”4 Ì·.”5 Ì·/‘”	 Ì¸’” Ì¹” Ì¹’” Ì¼” Ì¼’” Ì½” Ì½
+Ü ” Ì½” Ì½
+” ÌÓ” ÌÓ” ÌÓ” ÌÓ” ÌÓ”! ÌÓ”% ÌÓ”& ÌÓ”0 ÌÓ"”1 ÌÓ#”2 ÌÓ$”3 ÌÓ%”4 ÌÓ&”5 ÌÓ'”6 ÌÓ(”7 ÌÓ)”9 ÌÓ+”; ÌÓ-Ü ” Ì¾” Ì¾
+” Ì¾” Ì¾”( Ì¾”* Ì¾”3 Ì¾&”4 Ì¾'”Ì@ Ì¾3”ÌB Ì¾5”ÌL Ì¾?”ÌN Ì¾ÌA”ÌW Ì¾ÌJ”ÌX Ì¾ÌK”Ì^ Ì¾ÌQ”Ì` Ì¾ÌS” Ì¿” Ì¿” Ì¿” Ì¿” Ì¿”) Ì¿”* Ì¿”. Ì¿#”/ Ì¿$”? Ì¿4”Ì@ Ì¿5”ÌA Ì¿6”ÌF Ì¿;Ü ” Ì¿” Ì¿” ÌÀ” ÌÀ” ÌÀ” ÌÀ” ÌÀ”) ÌÀ#”* ÌÀ$”+ ÌÀ%”, ÌÀ&”. ÌÀ(”/ ÌÀ)”0 ÌÀ*”1 ÌÀ+”3 ÌÀ-˜” Ì¿” Ì¿” ÌÁ” ÌÁ” ÌÁ”  ÌÁ”! ÌÁ”& ÌÁ –” Ì¿” Ì¿” ÌÂ” ÌÂ” ÌÂ” ÌÂ˜” Ì¿” Ì¿” ÌÃ” ÌÃ” ÌÃ”& ÌÃ ”' ÌÃ!”+ ÌÃ%Ü ” Ì¿” Ì¿” ÌÄ” ÌÄ” ÌÄ”  ÌÄ”! ÌÄ”+ ÌÄ%”, ÌÄ&”- ÌÄ'”. ÌÄ(”0 ÌÄ*”1 ÌÄ+”2 ÌÄ,”3 ÌÄ-”ÌF ÌÄÌ@–” Ì¿” Ì¿” ÌÅ” ÌÅ” ÌÅ” ÌÅœ” Ì¿” Ì¿” ÌÆ” ÌÆ” ÌÆ”  ÌÆ”( ÌÆ"”* ÌÆ$”6 ÌÆ0”7 ÌÆ1”? ÌÆ9”ÌA ÌÆ;’” Ì¿” Ì¿’” Ì¾” Ì¾
+” ÌÉ” ÌÉ
+” ÌÉ” ÌÉ” ÌÉ”) ÌÉ”* ÌÉ”. ÌÉ!”/ ÌÉ"”? ÌÉ2”Ì@ ÌÉ3”ÌA ÌÉ4”ÌG ÌÉ:˜” ÌÉ” ÌÉ
+” ÌÊ	” ÌÊ” ÌÊ”$ ÌÊ”% ÌÊ”* ÌÊ"Ü ” ÌÉ” ÌÉ
+” ÌË	” ÌË” ÌË” ÌË” ÌË”) ÌË!”* ÌË"”+ ÌË#”, ÌË$”. ÌË&”/ ÌË'”0 ÌË(”1 ÌË)”3 ÌË+–” ÌÉ” ÌÉ
+” ÌÌ	” ÌÌ” ÌÌ”& ÌÌÜ ” ÌÉ” ÌÉ
+” ÌÍ	” ÌÍ” ÌÍ”  ÌÍ”! ÌÍ”+ ÌÍ#”, ÌÍ$”- ÌÍ%”. ÌÍ&”0 ÌÍ(”1 ÌÍ)”2 ÌÍ*”3 ÌÍ+”ÌA ÌÍ9–” ÌÉ” ÌÉ
+” ÌÎ	” ÌÎ” ÌÎ” ÌÎ˜” ÌÉ” ÌÉ
+” ÌÏ	” ÌÏ” ÌÏ”& ÌÏ”' ÌÏ”. ÌÏ&–” ÌÉ” ÌÉ
+” ÌÐ	” ÌÐ” ÌÐ” ÌÐœ” ÌÉ” ÌÉ
+” ÌÑ	” ÌÑ” ÌÑ”  ÌÑ”( ÌÑ ”* ÌÑ"”6 ÌÑ.”7 ÌÑ/”? ÌÑ7”ÌA ÌÑ9’” ÌÉ” ÌÉ
+’” Ì½” Ì½
+‘” ÌÔ’” ÌÖ” ÌÖ’” Ì×” Ì×Ü ” ÌØ” ÌØ
+” ÌØ” ÌØ” ÌØ”  ÌØ”. ÌØ(”0 ÌØ+”1 ÌØ,”Ì@ ÌØ;”ÌA ÌØ<”ÌP ÌØÌK”ÌQ ÌØÌL”ÌU ÌØÌP”ÌV ÌØÌQ”Ìb ÌØÌ]”Ìc ÌØÌ^”Ìd ÌØÌ_”Ìe ÌØÌ`”Ìf ÌØÌa”Ìk ÌØÌf”Ìl ÌØÌg”Ìn ÌØÌi”Ìo ÌØÌj—” ÌÙ	” ÌÙ” ÌÙ” ÌÙ” ÌÙ ” ÌÙ"”  ÌÙ$˜” ÌÚ
+” ÌÚ” ÌÚ” ÌÚ”" ÌÚ”# ÌÚ”) ÌÚ2”* ÌÚ3›” ÌÛ
+” ÌÛ” ÌÛ”" ÌÛ/”' ÌÛ4”( ÌÛ5”9 ÌÛÌF”: ÌÛÌG”Ì@ ÌÛÌM”ÌA ÌÛÌN”ÌB ÌÛÌO–” ÌÜ
+” ÌÜ”# ÌÜ”& ÌÜ<”/ ÌÜÌE”0 ÌÜÌFœ” ÌÝ
+” ÌÝ” ÌÝ”* ÌÝ$”, ÌÝ&”- ÌÝ'”1 ÌÝ+”2 ÌÝ,”3 ÌÝ-”; ÌÝ5”= ÌÝ7”? ÌÝ9” ÌÞ” ÌÞ” ÌÞ”/ ÌÞ'”0 ÌÞ(”8 ÌÞ0”: ÌÞ2”; ÌÞ3”Ì@ ÌÞ8”ÌB ÌÞ:”ÌM ÌÞÌE”ÌO ÌÞÌG”ÌQ ÌÞÌI”” Ìß” Ìß”! Ìß”# ÌßÜ ” Ìà”" Ìà”# Ìà”( Ìà”) Ìà”ÌR ÌàÌF”ÌW ÌàÌK”ÌX ÌàÌL”Ì\ ÌàÌP”Ìj ÌàÌ^”Ìo ÌàÌc”Ìp ÌàÌd”Ìw ÌàÌk”Ìy ÌàÌm”Ìz ÌàÌn”Ì{ ÌàÌo‘” Ìá‘” Ìá•” Ìâ”+ Ìâ”. Ìâ"”6 Ìâ*”7 Ìâ+™” Ìã”  Ìã”% Ìã”( Ìã-”3 Ìã8”4 Ìã9”ÌM ÌãÌR”ÌO ÌãÌT”ÌP ÌãÌUÜ ” Ìä”  Ìä”( Ìä”+ Ìä)”5 Ìä3”6 Ìä4”? Ìä=”Ì@ Ìä>”ÌE ÌäÌC”ÌF ÌäÌD”ÌI ÌäÌG”ÌK ÌäÌI”ÌP ÌäÌN”ÌQ ÌäÌO”ÌV ÌäÌT”ÌX ÌäÌV”Ì] ÌäÌ[”Ì^ ÌäÌ\”Ìb ÌäÌ`”Ìc ÌäÌa”Ìd ÌäÌbÜ ” Ìå”  Ìå”! Ìå”+ Ìå”. Ìå"”6 Ìå*”> Ìå2”? Ìå3”Ì@ Ìå4”ÌA Ìå5”ÌF Ìå:”ÌN ÌåÌB”ÌO ÌåÌC”ÌP ÌåÌD”ÌQ ÌåÌE”ÌV ÌåÌJ”Ì^ ÌåÌR”Ì_ ÌåÌS”Ì` ÌåÌT”Ìa ÌåÌU”Ìg ÌåÌ[”Ìh ÌåÌ\‘” Ìæ”” Ìç” Ìç” Ìç” Ìç›” Ìè” Ìè”" Ìè”% Ìè”. Ìè&”/ Ìè'”; Ìè3”< Ìè4”ÌD Ìè<”ÌE Ìè=”ÌF Ìè>–” Ìé” Ìé”" Ìé”' Ìé”+ Ìé#”- Ìé%˜” Ìê”" Ìê”# Ìê”' Ìê”( Ìê”* Ìê ”+ Ìê!”, Ìê"œ” Ìë”" Ìë”# Ìë”4 Ìë*”6 Ìë,”7 Ìë-”; Ìë1”< Ìë2”= Ìë3”ÌB Ìë8”ÌD Ìë:”ÌF Ìë<—” Ìì”  Ìì”! Ìì”+ Ìì”. Ìì"”3 Ìì'”4 Ìì(”” Ìí” Ìí” Ìí” Ìí‘” Ìî“” Ìï
+” Ìï” Ìï•” Ìð” Ìð” Ìð”  Ìð”" Ìð–” Ìñ” Ìñ”! Ìñ”( Ìñ"”* Ìñ$”+ Ìñ%–” Ìò”# Ìò”% Ìò”, Ìò&”. Ìò(”/ Ìò)“” Ìó” Ìó” Ìó—” Ìô” Ìô” Ìô” Ìô”! Ìô(”# Ìô*”% Ìô,Ü ” Ìõ” Ìõ” Ìõ”  Ìõ”! Ìõ”: Ìõ4”? Ìõ9”Ì@ Ìõ:”ÌD Ìõ>”ÌR ÌõÌL”ÌW ÌõÌQ”ÌX ÌõÌR”Ì_ ÌõÌY”Ìa ÌõÌ[”Ìb ÌõÌ\”Ìc ÌõÌ]”” Ìö” Ìö” Ìö” Ìö“” Ì÷” Ì÷	” Ì÷
+—” Ìø	” Ìø” Ìø” Ìø” Ìø$” Ìø&”! Ìø(Ü ” Ìù
+” Ìù” Ìù” Ìù” Ìù”7 Ìù1”< Ìù6”= Ìù7”ÌA Ìù;”ÌO ÌùÌI”ÌT ÌùÌN”ÌU ÌùÌO”Ì\ ÌùÌV”Ì^ ÌùÌX”Ì_ ÌùÌY”Ì` ÌùÌZ”” Ìú” Ìú	” Ìú
+” Ìú
+‘”	 Ìû”” Ìû” Ìû” Ìû” Ìûš” Ìü” Ìü” Ìü” Ìü” Ìü”1 Ìü+”6 Ìü0”8 Ìü2”9 Ìü3”: Ìü4‘”	 Ìý’” Ìþ” Ìþ‘” Í ‘” Í”” Í
+”	 Í”
+ Í”" Í(’” Í” Íœ” Í” Í” Í” Í”  Í”! Í”- Í'”/ Í)”0 Í*”> Í8”Ì@ Í:”ÌA Í;”” Í” Í
+” Í” Í’” Í” Í’” Í” Íž” Í	” Í	” Í	”! Í	”' Í	!”+ Í	%”, Í	&”< Í	6”= Í	7”ÌO Í	ÌI”ÌP Í	ÌJ”ÌW Í	ÌQ”ÌX Í	ÌR”ÌY Í	ÌS’” Í”  Í–” Í” Í
+” Í” Í”  Í”" Íš” Í” Í” Í” Í” Í”) Í!”5 Í-”9 Í1”: Í2”; Í3’” Í”% Í•” Í” Í” Í” Í”  Íš” Í
+” Í” Í”) Í”* Í ”. Í$”/ Í%”; Í1”< Í2”= Í3–” Í” Í	” Í” Í” Í” Í‘” Í‘”	 Í”” Í” Í” Í” Íš” Í” Í” Í” Í” Í”& Í ”+ Í%”- Í'”. Í(”/ Í)‘”	 Í’” Í” ÍÔrH–§version¤file§sources®sourcesContent¥names¨mappingsÀ‘À‘ÀÜ²‘”    ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”  	 ‘”  
+ ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”    ‘”  ! ‘”  " ‘”  # ‘”  $ ‘”  % ‘”  & ‘”  ' ‘”  ( ‘”  ) ‘”  * ‘”  + ‘”  , ‘”  - ‘”  . ‘”  / ‘”  0 ‘”  1 ‘”  2 ‘”  3 ‘”  4 ‘”  5 ‘”  6 ‘”  7 ‘”  8 ‘”  9 ‘”  : ‘”  ; ‘”  < ‘”  = ‘”  > ‘”  ? ‘”  Ì@ ‘”  ÌA ‘”  ÌB ‘”  ÌC ‘”  ÌD ‘”  ÌE ‘”  ÌF ‘”  ÌG ‘”  ÌH ‘”  ÌI ‘”  ÌJ ‘”  ÌK ‘”  ÌL ‘”  ÌM ‘”  ÌN ‘”  ÌO ‘”  ÌP ‘”  ÌQ ‘”  ÌR ‘”  ÌS ‘”  ÌT ‘”  ÌU ‘”  ÌV ‘”  ÌW ‘”  ÌX ‘”  ÌY ‘”  ÌZ ‘”  Ì[ ‘”  Ì\ ‘”  Ì] ‘”  Ì^ ‘”  Ì_ ‘”  Ì` ‘”  Ìa ‘”  Ìb ‘”  Ìc ‘”  Ìd ‘”  Ìe ‘”  Ìf ‘”  Ìg ‘”  Ìh ‘”  Ìi ‘”  Ìj ‘”  Ìk ‘”  Ìl ‘”  Ìm ‘”  Ìn ‘”  Ìo ‘”  Ìp ‘”  Ìq ‘”  Ìr ‘”  Ìs ‘”  Ìt ‘”  Ìu ‘”  Ìv ‘”  Ìw ‘”  Ìx ‘”  Ìy ‘”  Ìz ‘”  Ì{ ‘”  Ì| ‘”  Ì} ‘”  Ì~ ‘”  Ì ‘”  Ì€ ‘”  Ì ‘”  Ì‚ ‘”  Ìƒ ‘”  Ì„ ‘”  Ì… ‘”  Ì† ‘”  Ì‡ ‘”  Ìˆ ‘”  Ì‰ ‘”  ÌŠ ‘”  Ì‹ ‘”  ÌŒ ‘”  Ì ‘”  ÌŽ ‘”  Ì ‘”  Ì ‘”  Ì‘ ‘”  Ì’ ‘”  Ì“ ‘”  Ì” ‘”  Ì• ‘”  Ì– ‘”  Ì— ‘”  Ì˜ ‘”  Ì™ ‘”  Ìš ‘”  Ì› ‘”  Ìœ ‘”  Ì ‘”  Ìž ‘”  ÌŸ ‘”  Ì  ‘”  Ì¡ ‘”  Ì¢ ‘”  Ì£ ‘”  Ì¤ ‘”  Ì¥ ‘”  Ì¦ ‘”  Ì§ ‘”  Ì¨ ‘”  Ì© ‘”  Ìª ‘”  Ì« ‘”  Ì¬ ‘”  Ì­ ‘”  Ì® ‘”  Ì¯ ‘”  Ì° ‘”  Ì± ‘”  Ì² ‘”  Ì³ ‘”  Ì´ ‘”  Ìµ ‘”  Ì¶ ‘”  Ì· ‘”  Ì¸ ‘”  Ì¹ ‘”  Ìº ‘”  Ì» ‘”  Ì¼ ‘”  Ì½ ‘”  Ì¾ ‘”  Ì¿ ‘”  ÌÀ ‘”  ÌÁ ‘”  ÌÂ ‘”  ÌÃ ‘”  ÌÄ ‘”  ÌÅ ‘”  ÌÆ ‘”  ÌÇ ‘”  ÌÈ ‘”  ÌÉ ‘”  ÌÊ ‘”  ÌË ‘”  ÌÌ ‘”  ÌÍ ‘”  ÌÎ ‘”  ÌÏ ‘”  ÌÐ ‘”  ÌÑ ‘”  ÌÒ ‘”  ÌÓ ‘”  ÌÔ ‘”  ÌÕ ‘”  ÌÖ ‘”  Ì× ‘”  ÌØ ‘”  ÌÙ ‘”  ÌÚ ‘”  ÌÛ ‘”  ÌÜ ‘”  ÌÝ ‘”  ÌÞ ‘”  Ìß ‘”  Ìà ‘”  Ìá ‘”  Ìâ ‘”  Ìã ‘”  Ìä ‘”  Ìå ‘”  Ìæ ‘”  Ìç ‘”  Ìè ‘”  Ìé ‘”  Ìê ‘”  Ìë ‘”  Ìì ‘”  Ìí ‘”  Ìî ‘”  Ìï ‘”  Ìð ‘”  Ìñ ‘”  Ìò ‘”  Ìó ‘”  Ìô ‘”  Ìõ ‘”  Ìö ‘”  Ì÷ ‘”  Ìø ‘”  Ìù ‘”  Ìú ‘”  Ìû ‘”  Ìü ‘”  Ìý ‘”  Ìþ ‘”  Ìÿ ‘”  Í  ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í	 ‘”  Í
+ ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í  ‘”  Í! ‘”  Í" ‘”  Í# ‘”  Í$ ‘”  Í% ‘”  Í& ‘”  Í' ‘”  Í( ‘”  Í) ‘”  Í* ‘”  Í+ ‘”  Í, ‘”  Í- ‘”  Í. ‘”  Í/ ‘”  Í0 ‘”  Í1 ‘”  Í2 ‘”  Í3 ‘”  Í4 ‘”  Í5 ‘”  Í6 ‘”  Í7 ‘”  Í8 ‘”  Í9 ‘”  Í: ‘”  Í; ‘”  Í< ‘”  Í= ‘”  Í> ‘”  Í? ‘”  Í@ ‘”  ÍA ‘”  ÍB ‘”  ÍC ‘”  ÍD ‘”  ÍE ‘”  ÍF ‘”  ÍG ‘”  ÍH ‘”  ÍI ‘”  ÍJ ‘”  ÍK ‘”  ÍL ‘”  ÍM ‘”  ÍN ‘”  ÍO ‘”  ÍP ‘”  ÍQ ‘”  ÍR ‘”  ÍS ‘”  ÍT ‘”  ÍU ‘”  ÍV ‘”  ÍW ‘”  ÍX ‘”  ÍY ‘”  ÍZ ‘”  Í[ ‘”  Í\ ‘”  Í] ‘”  Í^ ‘”  Í_ ‘”  Í` ‘”  Ía ‘”  Íb ‘”  Íc ‘”  Íd ‘”  Íe ‘”  Íf ‘”  Íg ‘”  Íh ‘”  Íi ‘”  Íj ‘”  Ík ‘”  Íl ‘”  Ím ‘”  Ín ‘”  Ío ‘”  Íp ‘”  Íq ‘”  Ír ‘”  Ís ‘”  Ít ‘”  Íu ‘”  Ív ‘”  Íw ‘”  Íx ‘”  Íy ‘”  Íz ‘”  Í{ ‘”  Í| ‘”  Í} ‘”  Í~ ‘”  Í ‘”  Í€ ‘”  Í ‘”  Í‚ ‘”  Íƒ ‘”  Í„ ‘”  Í… ‘”  Í† ‘”  Í‡ ‘”  Íˆ ‘”  Í‰ ‘”  ÍŠ ‘”  Í‹ ‘”  ÍŒ ‘”  Í ‘”  ÍŽ ‘”  Í ‘”  Í ‘”  Í‘ ‘”  Í’ ‘”  Í“ ‘”  Í” ‘”  Í• ‘”  Í– ‘”  Í— ‘”  Í˜ ‘”  Í™ ‘”  Íš ‘”  Í› ‘”  Íœ ‘”  Í ‘”  Íž ‘”  ÍŸ ‘”  Í  ‘”  Í¡ ‘”  Í¢ ‘”  Í£ ‘”  Í¤ ‘”  Í¥ ‘”  Í¦ ‘”  Í§ ‘”  Í¨ ‘”  Í© ‘”  Íª ‘”  Í« ‘”  Í¬ ‘”  Í­ ‘”  Í® ‘”  Í¯ ‘”  Í° ‘”  Í± ÔrI’§missing¦pluginÃ¦genAbcÂÔ  ÔrJ”²dynamicImportCache¹exportAllDeclarationCache»exportNamedDeclarationCache«importCache˜ÔrK•¤type¥start£endªspecifiers¦source±ImportDeclarationÌ€Ì¨‘ÔrL”¤type¥start£end¥local¶ImportDefaultSpecifierÌ‡ÌÔrM”¤type¥start£end¤nameªIdentifierÌ‡Ì©effectKitÔrN•¤type¥start£end¥value£raw§LiteralÌ–Ì§¯@ohos.effectKit±"@ohos.effectKit"K±ImportDeclarationÌªÌÕ‘L¶ImportDefaultSpecifierÌ±Ì¶MªIdentifierÌ±Ì¶¥imageN§LiteralÌ¼ÌÔ¶@ohos.multimedia.image¸"@ohos.multimedia.image"K±ImportDeclarationÌ×Í ‘ÔrO•¤type¥start£end¨imported¥local¯ImportSpecifierÌàÌæMªIdentifierÌàÌæ¦LoggerMªIdentifierÌàÌæ¦LoggerN§LiteralÌîÌÿ¯../utils/Logger±'../utils/Logger'K±ImportDeclarationÍÍL‘O¯ImportSpecifierÍÍMªIdentifierÍÍ´ControlAreaComponentMªIdentifierÍÍ´ControlAreaComponentN§LiteralÍ'ÍKÙ"../components/ControlAreaComponentÙ$'../components/ControlAreaComponent'K±ImportDeclarationÍNÍ’‘O¯ImportSpecifierÍWÍhMªIdentifierÍWÍh±PlayListComponentMªIdentifierÍWÍh±PlayListComponentN§LiteralÍpÍ‘¿../components/PlayListComponentÙ!'../components/PlayListComponent'K±ImportDeclarationÍ”Íé”O¯ImportSpecifierÍÍ©MªIdentifierÍÍ©¬songDataListMªIdentifierÍÍ©¬songDataListO¯ImportSpecifierÍ«Í´MªIdentifierÍ«Í´©AudioNameMªIdentifierÍ«Í´©AudioNameO¯ImportSpecifierÍ¶Í¿MªIdentifierÍ¶Í¿©AudioTypeMªIdentifierÍ¶Í¿©AudioTypeO¯ImportSpecifierÍÁÍËMªIdentifierÍÁÍËªDeviceUtilMªIdentifierÍÁÍËªDeviceUtilN§LiteralÍÓÍè³../common/Constantsµ'../common/Constants'K±ImportDeclarationÍëÍ‘O¯ImportSpecifierÍôÍþMªIdentifierÍôÍþªColorToolsMªIdentifierÍôÍþªColorToolsN§LiteralÍÍ³../utils/ColorToolsµ'../utils/ColorTools'K±ImportDeclarationÍÍ\‘O¯ImportSpecifierÍ'Í7MªIdentifierÍ'Í7°PlayerControllerMªIdentifierÍ'Í7°PlayerControllerN§LiteralÍ?Í[º../player/PlayerController¼'../player/PlayerController'
