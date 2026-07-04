@@ -1,0 +1,129 @@
+import media from "@ohos:multimedia.media";
+import { Logger } from "@normalized:N&&&entry/src/main/ets/utils/Logger&";
+import { MediaTools } from "@normalized:N&&&entry/src/main/ets/utils/MediaTools&";
+import type { BusinessError } from "@ohos:base";
+import audio from "@ohos:multimedia.audio";
+// [Start AVPlayerController_methods]
+export class AVPlayerController {
+    // [StartExclude AVPlayerController_methods]
+    private avPlayer: media.AVPlayer | undefined = undefined;
+    private currentTime: number = 0;
+    private isReset = false;
+    async init(fd: number, offset: number, length: number): Promise<void> {
+        try {
+            this.avPlayer = await media.createAVPlayer();
+            this.avPlayer.audioInterruptMode = audio.InterruptMode.INDEPENDENT_MODE;
+            await this.setAVPlayerCallback();
+            this.avPlayer.fdSrc = { fd: fd, offset: offset, length: length };
+        }
+        catch (error) {
+            Logger.error('AVPlayer init fail.');
+        }
+    }
+    prepare(): void {
+        this.avPlayer?.prepare((err: BusinessError) => {
+            if (err) {
+                Logger.error('Failed to prepare,error message is :' + err.message);
+            }
+            else {
+                Logger.info('Succeeded in preparing');
+            }
+        });
+    }
+    // [EndExclude AVPlayerController_methods]
+    reset(fd: number, offset: number, length: number): void {
+        this.currentTime = AppStorage.get('progress') as number;
+        this.isReset = true;
+        this.avPlayer?.reset(() => {
+            if (this.avPlayer != undefined) {
+                this.avPlayer.fdSrc = { fd: fd, offset: offset, length: length };
+            }
+        });
+    }
+    // [StartExclude AVPlayerController_methods]
+    stop(): void {
+        this.avPlayer?.stop().catch(() => {
+            Logger.error('AVPlayerController stop error!');
+        });
+    }
+    play(): void {
+        this.avPlayer?.play().catch(() => {
+            Logger.error('AVPlayerController play error!');
+        });
+    }
+    // [EndExclude AVPlayerController_methods]
+    // Pause playback
+    pause(): void {
+        this.avPlayer?.pause().catch(() => {
+            Logger.error('AVPlayerController pause error!');
+        });
+    }
+    // Jump to playback
+    seek(currentTime: number): void {
+        this.avPlayer?.seek(currentTime, media.SeekMode.SEEK_NEXT_SYNC);
+    }
+    // 设置播放速度
+    setSpeed(speed: number): void {
+        if (this.avPlayer) {
+            this.avPlayer.setSpeed(speed);
+        }
+    }
+    // 获取当前播放时间（毫秒）
+    getCurrentTime(): number {
+        return this.currentTime;
+    }
+    // [StartExclude AVPlayerController_methods]
+    private async setAVPlayerCallback(): Promise<void> {
+        if (!this.avPlayer) {
+            return;
+        }
+        this.avPlayer.on('timeUpdate', (currentTime: number) => {
+            if (!this.isReset) {
+                AppStorage.setOrCreate('progress', currentTime);
+                AppStorage.setOrCreate('currentTime', MediaTools.msToCountdownTime(currentTime));
+            }
+        });
+        this.avPlayer.on('durationUpdate', (time: number) => {
+            AppStorage.setOrCreate('progressMax', time);
+            AppStorage.setOrCreate('totalTime', MediaTools.msToCountdownTime(time));
+        });
+        this.avPlayer.on('error', (error: BusinessError) => {
+            Logger.error('error happened,and error message is :' + error.message);
+            Logger.error('error happened,and error code is :' + error.code);
+        });
+        this.avPlayer.on('stateChange', (state, reason) => {
+            if (!this.avPlayer) {
+                return;
+            }
+            switch (state) {
+                case 'idle':
+                    break;
+                case 'initialized':
+                    this.prepare();
+                    break;
+                case 'prepared': // This state machine is reported after the prepare interface is successfully invoked.
+                    this.avPlayer.loop = true;
+                    this.avPlayer.play().then(() => {
+                        this.seek(this.currentTime);
+                        this.isReset = false;
+                    }).catch(() => {
+                    });
+                    break;
+                case 'playing': // After the play interface is successfully invoked, the state machine is reported.
+                    break;
+                case 'completed': // This state machine is triggered to report when the playback ends.
+                    break;
+                case 'error':
+                    Logger.error('AVPlayer error!' + reason);
+                    break;
+                default:
+                    break;
+            }
+        });
+    }
+    release() {
+        this.avPlayer?.release().catch(() => {
+            Logger.error('AVPlayerController release error!');
+        });
+    }
+}
