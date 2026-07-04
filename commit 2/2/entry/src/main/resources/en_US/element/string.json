@@ -1,0 +1,36 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "AudioFormatSwitch"
+    },
+    {
+      "name": "page_show",
+      "value": "page from package"
+    },
+    {
+      "name": "play_list",
+      "value": "play list(%d)"
+    },
+    {
+      "name": "standard_quality",
+      "value": "MP3 SQ(AVPlayer)"
+    },
+    {
+      "name": "flac_high_quality",
+      "value": "FLAC HQ(AVPlayer)"
+    },
+    {
+      "name": "pcm_high_quality",
+      "value": "PCM HQ(AudioRenderer)"
+    }
+  ]
+}

@@ -1,0 +1,767 @@
+Ôr@Ÿªassertions¤code´customTransformCache¬dependencies¢id¤meta±moduleSideEffects¬originalCode±originalSourcemap«resolvedIds®sourcemapChainµsyntheticNamedExportsµtransformDependencies®transformFiles¨cacheAstÔrAÚ%Ë/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import { Logger } from './Logger';
+/**
+ * 10æ®µå‡è¡¡å™¨é¢‘æ®µé…ç½® (ä¸­å¿ƒé¢‘ç‡ Hz)
+ */
+const EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_LABELS = ['31', '62', '125', '250', '500', '1K', '2K', '4K', '8K', '16K'];
+/**
+ * å‡è¡¡å™¨æ§åˆ¶å™¨
+ * æ”¯æŒ10æ®µå‡è¡¡è°ƒèŠ‚ã€é¢„è®¾æ¨¡å¼ã€PCMæ•°æ®å¤„ç†
+ */
+export class EqualizerController {
+    constructor() {
+        this.bands = [];
+        this.isEnabled = false;
+        this.currentPreset = 'FLAT';
+        this.sampleRate = 48000;
+        this.channels = 2;
+        // ç®€æ˜“IIRæ»¤æ³¢å™¨çŠ¶æ€ (æ¯ä¸ªé¢‘æ®µ2ä¸ªé€šé“)
+        this.filterStates = [];
+        this.initBands();
+        this.applyPreset('FLAT');
+    }
+    /**
+     * åˆå§‹åŒ–é¢‘æ®µ
+     */
+    initBands() {
+        this.bands = [];
+        for (let i = 0; i < EQ_FREQUENCIES.length; i++) {
+            this.bands.push({
+                frequency: EQ_FREQUENCIES[i],
+                gain: 0,
+                label: EQ_LABELS[i]
+            });
+        }
+        // åˆå§‹åŒ–æ»¤æ³¢å™¨çŠ¶æ€: [band][channel][state0, state1]
+        this.filterStates = [];
+        for (let i = 0; i < this.bands.length; i++) {
+            this.filterStates.push([
+                [0, 0],
+                [0, 0] // å³å£°é“
+            ]);
+        }
+    }
+    /**
+     * è®¾ç½®é‡‡æ ·ç‡
+     */
+    setSampleRate(rate) {
+        this.sampleRate = rate;
+    }
+    /**
+     * è®¾ç½®å£°é“æ•°
+     */
+    setChannels(ch) {
+        this.channels = ch;
+    }
+    /**
+     * è·å–é¢‘æ®µæ•°é‡
+     */
+    getBandCount() {
+        return this.bands.length;
+    }
+    /**
+     * è·å–æ‰€æœ‰é¢‘æ®µ
+     */
+    getBands() {
+        return this.bands;
+    }
+    /**
+     * è®¾ç½®æŸä¸ªé¢‘æ®µçš„å¢ç›Š
+     * @param bandIndex é¢‘æ®µç´¢å¼• (0-9)
+     * @param gainDb å¢ç›Šå€¼ (dB), èŒƒå›´ -12 ~ +12
+     */
+    setBandGain(bandIndex, gainDb) {
+        if (bandIndex < 0 || bandIndex >= this.bands.length) {
+            return;
+        }
+        const clampedGain = Math.max(-12, Math.min(12, gainDb));
+        this.bands[bandIndex].gain = clampedGain;
+        this.currentPreset = 'FLAT'; // æ‰‹åŠ¨è°ƒèŠ‚åæ¸…é™¤é¢„è®¾
+        Logger.info(`EQ band ${bandIndex} (${this.bands[bandIndex].frequency}Hz) gain: ${clampedGain}dB`);
+    }
+    /**
+     * è·å–å‡è¡¡å™¨å¯ç”¨çŠ¶æ€
+     */
+    getEnabled() {
+        return this.isEnabled;
+    }
+    /**
+     * è®¾ç½®å‡è¡¡å™¨å¯ç”¨çŠ¶æ€
+     */
+    setEnabled(enabled) {
+        this.isEnabled = enabled;
+        if (!enabled) {
+            this.resetFilterStates();
+        }
+        Logger.info(`Equalizer ${enabled ? 'enabled' : 'disabled'}`);
+    }
+    /**
+     * è·å–å½“å‰é¢„è®¾åç§°
+     */
+    getPreset() {
+        return this.currentPreset;
+    }
+    /**
+     * åº”ç”¨é¢„è®¾
+     */
+    applyPreset(preset) {
+        const gains = EqualizerController.getPresetGains(preset);
+        for (let i = 0; i < this.bands.length; i++) {
+            this.bands[i].gain = gains[i];
+        }
+        this.currentPreset = preset;
+        this.isEnabled = preset !== 'FLAT';
+        this.resetFilterStates();
+        Logger.info(`EQ preset applied: ${preset}`);
+    }
+    /**
+     * è·å–é¢„è®¾å¢ç›Šé…ç½®
+     */
+    static getPresetGains(preset) {
+        switch (preset) {
+            case 'FLAT':
+                return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            case 'POP':
+                // æµè¡Œ: ä½é¢‘å’Œé«˜é¢‘ç•¥æå‡, ä¸­é¢‘å¾®é™
+                return [-1, 0, 2, 4, 5, 4, 2, 0, -1, -2];
+            case 'ROCK':
+                // æ‘‡æ»š: ä½é¢‘å’Œé«˜é¢‘å¢å¼º, ä¸­é¢‘å‡¹é™· (Vå‹)
+                return [5, 4, 2, 0, -2, -2, 0, 2, 4, 5];
+            case 'JAZZ':
+                // çˆµå£«: ä½é¢‘æ¸©æš–, é«˜é¢‘æ˜äº®
+                return [3, 2, 0, 2, 3, 2, 0, 1, 3, 4];
+            case 'CLASSICAL':
+                // å¤å…¸: å®½å¹¿çš„é¢‘ç‡å“åº”, é«˜ä½é¢‘ç•¥æå‡
+                return [4, 3, 1, 0, -1, -1, 0, 1, 3, 4];
+            case 'VOCAL':
+                // äººå£°: ä¸­é¢‘çªå‡º (500Hz-4KHz)
+                return [-3, -2, 0, 2, 5, 6, 5, 2, 0, -2];
+            case 'BASS_BOOST':
+                // ä½éŸ³å¢å¼º
+                return [8, 6, 4, 2, 0, 0, 0, 0, 0, 0];
+            case 'TREBLE_BOOST':
+                // é«˜éŸ³å¢å¼º
+                return [0, 0, 0, 0, 0, 0, 2, 4, 6, 8];
+            default:
+                return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        }
+    }
+    /**
+     * è·å–æ‰€æœ‰é¢„è®¾åç§°
+     */
+    static getPresetNames() {
+        return ['FLAT', 'POP', 'ROCK', 'JAZZ', 'CLASSICAL', 'VOCAL', 'BASS_BOOST', 'TREBLE_BOOST'];
+    }
+    /**
+     * è·å–é¢„è®¾æ˜¾ç¤ºåç§°
+     */
+    static getPresetDisplayName(preset) {
+        switch (preset) {
+            case 'FLAT': return 'é»˜è®¤';
+            case 'POP': return 'æµè¡Œ';
+            case 'ROCK': return 'æ‘‡æ»š';
+            case 'JAZZ': return 'çˆµå£«';
+            case 'CLASSICAL': return 'å¤å…¸';
+            case 'VOCAL': return 'äººå£°';
+            case 'BASS_BOOST': return 'ä½éŸ³å¢å¼º';
+            case 'TREBLE_BOOST': return 'é«˜éŸ³å¢å¼º';
+            default: return 'é»˜è®¤';
+        }
+    }
+    /**
+     * é‡ç½®æ»¤æ³¢å™¨çŠ¶æ€
+     */
+    resetFilterStates() {
+        for (let b = 0; b < this.filterStates.length; b++) {
+            for (let ch = 0; ch < this.filterStates[b].length; ch++) {
+                this.filterStates[b][ch][0] = 0;
+                this.filterStates[b][ch][1] = 0;
+            }
+        }
+    }
+    /**
+     * è®¡ç®—äºŒé˜¶IIR biquadæ»¤æ³¢å™¨ç³»æ•° (peaking EQ)
+     * è¿”å› [b0, b1, b2, a1, a2]
+     */
+    calcBiquadCoeffs(frequency, gainDb) {
+        const A = Math.pow(10, gainDb / 40); // sqrt of linear gain
+        const Q = 1.414; // sqrt(2), Butterworth Q
+        const w0 = 2 * Math.PI * frequency / this.sampleRate;
+        const sinW0 = Math.sin(w0);
+        const cosW0 = Math.cos(w0);
+        const alpha = sinW0 / (2 * Q);
+        const b0 = 1 + alpha * A;
+        const b1 = -2 * cosW0;
+        const b2 = 1 - alpha * A;
+        const a0 = 1 + alpha / A;
+        const a1 = -2 * cosW0;
+        const a2 = 1 - alpha / A;
+        // Normalize
+        return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
+    }
+    /**
+     * å¤„ç†PCMéŸ³é¢‘æ•°æ® (S16LEæ ¼å¼)
+     * å¯¹æ¯ä¸ªé¢‘æ®µåº”ç”¨biquadæ»¤æ³¢å™¨, ç„¶åæ··åˆè¾“å‡º
+     * @param buffer PCMæ•°æ®ç¼“å†²åŒº (S16LE, 16bit signed)
+     * @param bytesRead å®é™…è¯»å–çš„å­—èŠ‚æ•°
+     * @returns å¤„ç†åçš„æ•°æ®(åŸåœ°ä¿®æ”¹)
+     */
+    processPcmData(buffer, bytesRead) {
+        if (!this.isEnabled || bytesRead <= 0) {
+            return;
+        }
+        // æ£€æŸ¥æ˜¯å¦æœ‰éœ€è¦å¤„ç†çš„å¢ç›Š
+        let hasGain = false;
+        for (let b = 0; b < this.bands.length; b++) {
+            if (Math.abs(this.bands[b].gain) > 0.1) {
+                hasGain = true;
+                break;
+            }
+        }
+        if (!hasGain) {
+            return;
+        }
+        const view = new DataView(buffer);
+        const samplesCount = Math.floor(bytesRead / 2); // 16bit = 2 bytes per sample
+        const frameSize = this.channels; // samples per frame
+        // å¯¹æ¯ä¸ªé¢‘æ®µå¤„ç†
+        for (let b = 0; b < this.bands.length; b++) {
+            const gain = this.bands[b].gain;
+            if (Math.abs(gain) < 0.1) {
+                continue; // è·³è¿‡å¢ç›Šä¸º0çš„é¢‘æ®µ
+            }
+            const coeffs = this.calcBiquadCoeffs(this.bands[b].frequency, gain);
+            const b0 = coeffs[0];
+            const b1 = coeffs[1];
+            const b2 = coeffs[2];
+            const a1 = coeffs[3];
+            const a2 = coeffs[4];
+            // é€å¸§é€é€šé“å¤„ç†
+            for (let i = 0; i < samplesCount; i += frameSize) {
+                for (let ch = 0; ch < frameSize; ch++) {
+                    const sampleIdx = i + ch;
+                    if (sampleIdx * 2 + 1 >= bytesRead)
+                        break;
+                    // è¯»å–è¾“å…¥æ ·æœ¬ (S16LE)
+                    const x = view.getInt16(sampleIdx * 2, true);
+                    // Biquad Direct Form I
+                    const s0 = this.filterStates[b][ch][0];
+                    const s1 = this.filterStates[b][ch][1];
+                    const y = b0 * x + s0;
+                    this.filterStates[b][ch][0] = b1 * x - a1 * y + s1;
+                    this.filterStates[b][ch][1] = b2 * x - a2 * y;
+                    // å†™å› (é™å¹…)
+                    const clamped = Math.max(-32768, Math.min(32767, Math.round(y)));
+                    view.setInt16(sampleIdx * 2, clamped, true);
+                }
+            }
+        }
+    }
+    /**
+     * é‡ç½®ä¸ºé»˜è®¤çŠ¶æ€
+     */
+    reset() {
+        this.applyPreset('FLAT');
+        this.isEnabled = false;
+        this.resetFilterStates();
+    }
+}
+//# sourceMappingURL=EqualizerController.js.mapÂ‘ÙAC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\utils\Logger.etsÙNC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\utils\EqualizerController.etsÔrB›ªmoduleName±isLocalDependency¯isNodeEntryFile§pkgPath±belongProjectPath§pkgNameªpkgVersion±dependencyPkgInfo¯hostModulesInfo°belongModulePath¬shouldEmitJs¥entryÃÂÙ#C:\Users\Solitary\Desktop\3\3\entry½C:\Users\Solitary\Desktop\3\3¥entry¥1.0.0Ô  ’ÔrC’²hostDependencyName®hostModuleName¼../utils/EqualizerController¥entryC¼../utils/EqualizerController¥entryÙ#C:\Users\Solitary\Desktop\3\3\entryÃÃÚ#/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { Logger } from './Logger';
+
+/**
+ * å‡è¡¡å™¨é¢‘æ®µå®šä¹‰
+ */
+export interface EqBand {
+  frequency: number;    // ä¸­å¿ƒé¢‘ç‡ (Hz)
+  gain: number;         // å¢ç›Š (dB), èŒƒå›´ -12 ~ +12
+  label: string;        // æ˜¾ç¤ºæ ‡ç­¾
+}
+
+/**
+ * å‡è¡¡å™¨é¢„è®¾åç§°
+ */
+export type EqPresetName = 'FLAT' | 'POP' | 'ROCK' | 'JAZZ' | 'CLASSICAL' | 'VOCAL' | 'BASS_BOOST' | 'TREBLE_BOOST';
+
+/**
+ * 10æ®µå‡è¡¡å™¨é¢‘æ®µé…ç½® (ä¸­å¿ƒé¢‘ç‡ Hz)
+ */
+const EQ_FREQUENCIES: number[] = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_LABELS: string[] = ['31', '62', '125', '250', '500', '1K', '2K', '4K', '8K', '16K'];
+
+/**
+ * å‡è¡¡å™¨æ§åˆ¶å™¨
+ * æ”¯æŒ10æ®µå‡è¡¡è°ƒèŠ‚ã€é¢„è®¾æ¨¡å¼ã€PCMæ•°æ®å¤„ç†
+ */
+export class EqualizerController {
+  private bands: EqBand[] = [];
+  private isEnabled: boolean = false;
+  private currentPreset: EqPresetName = 'FLAT';
+  private sampleRate: number = 48000;
+  private channels: number = 2;
+
+  // ç®€æ˜“IIRæ»¤æ³¢å™¨çŠ¶æ€ (æ¯ä¸ªé¢‘æ®µ2ä¸ªé€šé“)
+  private filterStates: number[][][] = [];
+
+  constructor() {
+    this.initBands();
+    this.applyPreset('FLAT');
+  }
+
+  /**
+   * åˆå§‹åŒ–é¢‘æ®µ
+   */
+  private initBands(): void {
+    this.bands = [];
+    for (let i = 0; i < EQ_FREQUENCIES.length; i++) {
+      this.bands.push({
+        frequency: EQ_FREQUENCIES[i],
+        gain: 0,
+        label: EQ_LABELS[i]
+      });
+    }
+    // åˆå§‹åŒ–æ»¤æ³¢å™¨çŠ¶æ€: [band][channel][state0, state1]
+    this.filterStates = [];
+    for (let i = 0; i < this.bands.length; i++) {
+      this.filterStates.push([
+        [0, 0], // å·¦å£°é“
+        [0, 0]  // å³å£°é“
+      ]);
+    }
+  }
+
+  /**
+   * è®¾ç½®é‡‡æ ·ç‡
+   */
+  setSampleRate(rate: number): void {
+    this.sampleRate = rate;
+  }
+
+  /**
+   * è®¾ç½®å£°é“æ•°
+   */
+  setChannels(ch: number): void {
+    this.channels = ch;
+  }
+
+  /**
+   * è·å–é¢‘æ®µæ•°é‡
+   */
+  getBandCount(): number {
+    return this.bands.length;
+  }
+
+  /**
+   * è·å–æ‰€æœ‰é¢‘æ®µ
+   */
+  getBands(): EqBand[] {
+    return this.bands;
+  }
+
+  /**
+   * è®¾ç½®æŸä¸ªé¢‘æ®µçš„å¢ç›Š
+   * @param bandIndex é¢‘æ®µç´¢å¼• (0-9)
+   * @param gainDb å¢ç›Šå€¼ (dB), èŒƒå›´ -12 ~ +12
+   */
+  setBandGain(bandIndex: number, gainDb: number): void {
+    if (bandIndex < 0 || bandIndex >= this.bands.length) {
+      return;
+    }
+    const clampedGain = Math.max(-12, Math.min(12, gainDb));
+    this.bands[bandIndex].gain = clampedGain;
+    this.currentPreset = 'FLAT'; // æ‰‹åŠ¨è°ƒèŠ‚åæ¸…é™¤é¢„è®¾
+    Logger.info(`EQ band ${bandIndex} (${this.bands[bandIndex].frequency}Hz) gain: ${clampedGain}dB`);
+  }
+
+  /**
+   * è·å–å‡è¡¡å™¨å¯ç”¨çŠ¶æ€
+   */
+  getEnabled(): boolean {
+    return this.isEnabled;
+  }
+
+  /**
+   * è®¾ç½®å‡è¡¡å™¨å¯ç”¨çŠ¶æ€
+   */
+  setEnabled(enabled: boolean): void {
+    this.isEnabled = enabled;
+    if (!enabled) {
+      this.resetFilterStates();
+    }
+    Logger.info(`Equalizer ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  /**
+   * è·å–å½“å‰é¢„è®¾åç§°
+   */
+  getPreset(): EqPresetName {
+    return this.currentPreset;
+  }
+
+  /**
+   * åº”ç”¨é¢„è®¾
+   */
+  applyPreset(preset: EqPresetName): void {
+    const gains = EqualizerController.getPresetGains(preset);
+    for (let i = 0; i < this.bands.length; i++) {
+      this.bands[i].gain = gains[i];
+    }
+    this.currentPreset = preset;
+    this.isEnabled = preset !== 'FLAT';
+    this.resetFilterStates();
+    Logger.info(`EQ preset applied: ${preset}`);
+  }
+
+  /**
+   * è·å–é¢„è®¾å¢ç›Šé…ç½®
+   */
+  static getPresetGains(preset: EqPresetName): number[] {
+    switch (preset) {
+      case 'FLAT':
+        return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      case 'POP':
+        // æµè¡Œ: ä½é¢‘å’Œé«˜é¢‘ç•¥æå‡, ä¸­é¢‘å¾®é™
+        return [-1, 0, 2, 4, 5, 4, 2, 0, -1, -2];
+      case 'ROCK':
+        // æ‘‡æ»š: ä½é¢‘å’Œé«˜é¢‘å¢å¼º, ä¸­é¢‘å‡¹é™· (Vå‹)
+        return [5, 4, 2, 0, -2, -2, 0, 2, 4, 5];
+      case 'JAZZ':
+        // çˆµå£«: ä½é¢‘æ¸©æš–, é«˜é¢‘æ˜äº®
+        return [3, 2, 0, 2, 3, 2, 0, 1, 3, 4];
+      case 'CLASSICAL':
+        // å¤å…¸: å®½å¹¿çš„é¢‘ç‡å“åº”, é«˜ä½é¢‘ç•¥æå‡
+        return [4, 3, 1, 0, -1, -1, 0, 1, 3, 4];
+      case 'VOCAL':
+        // äººå£°: ä¸­é¢‘çªå‡º (500Hz-4KHz)
+        return [-3, -2, 0, 2, 5, 6, 5, 2, 0, -2];
+      case 'BASS_BOOST':
+        // ä½éŸ³å¢å¼º
+        return [8, 6, 4, 2, 0, 0, 0, 0, 0, 0];
+      case 'TREBLE_BOOST':
+        // é«˜éŸ³å¢å¼º
+        return [0, 0, 0, 0, 0, 0, 2, 4, 6, 8];
+      default:
+        return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    }
+  }
+
+  /**
+   * è·å–æ‰€æœ‰é¢„è®¾åç§°
+   */
+  static getPresetNames(): EqPresetName[] {
+    return ['FLAT', 'POP', 'ROCK', 'JAZZ', 'CLASSICAL', 'VOCAL', 'BASS_BOOST', 'TREBLE_BOOST'];
+  }
+
+  /**
+   * è·å–é¢„è®¾æ˜¾ç¤ºåç§°
+   */
+  static getPresetDisplayName(preset: EqPresetName): string {
+    switch (preset) {
+      case 'FLAT': return 'é»˜è®¤';
+      case 'POP': return 'æµè¡Œ';
+      case 'ROCK': return 'æ‘‡æ»š';
+      case 'JAZZ': return 'çˆµå£«';
+      case 'CLASSICAL': return 'å¤å…¸';
+      case 'VOCAL': return 'äººå£°';
+      case 'BASS_BOOST': return 'ä½éŸ³å¢å¼º';
+      case 'TREBLE_BOOST': return 'é«˜éŸ³å¢å¼º';
+      default: return 'é»˜è®¤';
+    }
+  }
+
+  /**
+   * é‡ç½®æ»¤æ³¢å™¨çŠ¶æ€
+   */
+  private resetFilterStates(): void {
+    for (let b = 0; b < this.filterStates.length; b++) {
+      for (let ch = 0; ch < this.filterStates[b].length; ch++) {
+        this.filterStates[b][ch][0] = 0;
+        this.filterStates[b][ch][1] = 0;
+      }
+    }
+  }
+
+  /**
+   * è®¡ç®—äºŒé˜¶IIR biquadæ»¤æ³¢å™¨ç³»æ•° (peaking EQ)
+   * è¿”å› [b0, b1, b2, a1, a2]
+   */
+  private calcBiquadCoeffs(frequency: number, gainDb: number): number[] {
+    const A = Math.pow(10, gainDb / 40); // sqrt of linear gain
+    const Q = 1.414; // sqrt(2), Butterworth Q
+    const w0 = 2 * Math.PI * frequency / this.sampleRate;
+    const sinW0 = Math.sin(w0);
+    const cosW0 = Math.cos(w0);
+    const alpha = sinW0 / (2 * Q);
+
+    const b0 = 1 + alpha * A;
+    const b1 = -2 * cosW0;
+    const b2 = 1 - alpha * A;
+    const a0 = 1 + alpha / A;
+    const a1 = -2 * cosW0;
+    const a2 = 1 - alpha / A;
+
+    // Normalize
+    return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
+  }
+
+  /**
+   * å¤„ç†PCMéŸ³é¢‘æ•°æ® (S16LEæ ¼å¼)
+   * å¯¹æ¯ä¸ªé¢‘æ®µåº”ç”¨biquadæ»¤æ³¢å™¨, ç„¶åæ··åˆè¾“å‡º
+   * @param buffer PCMæ•°æ®ç¼“å†²åŒº (S16LE, 16bit signed)
+   * @param bytesRead å®é™…è¯»å–çš„å­—èŠ‚æ•°
+   * @returns å¤„ç†åçš„æ•°æ®(åŸåœ°ä¿®æ”¹)
+   */
+  processPcmData(buffer: ArrayBuffer, bytesRead: number): void {
+    if (!this.isEnabled || bytesRead <= 0) {
+      return;
+    }
+
+    // æ£€æŸ¥æ˜¯å¦æœ‰éœ€è¦å¤„ç†çš„å¢ç›Š
+    let hasGain = false;
+    for (let b = 0; b < this.bands.length; b++) {
+      if (Math.abs(this.bands[b].gain) > 0.1) {
+        hasGain = true;
+        break;
+      }
+    }
+    if (!hasGain) {
+      return;
+    }
+
+    const view = new DataView(buffer);
+    const samplesCount = Math.floor(bytesRead / 2); // 16bit = 2 bytes per sample
+    const frameSize = this.channels; // samples per frame
+
+    // å¯¹æ¯ä¸ªé¢‘æ®µå¤„ç†
+    for (let b = 0; b < this.bands.length; b++) {
+      const gain = this.bands[b].gain;
+      if (Math.abs(gain) < 0.1) {
+        continue; // è·³è¿‡å¢ç›Šä¸º0çš„é¢‘æ®µ
+      }
+
+      const coeffs = this.calcBiquadCoeffs(this.bands[b].frequency, gain);
+      const b0 = coeffs[0];
+      const b1 = coeffs[1];
+      const b2 = coeffs[2];
+      const a1 = coeffs[3];
+      const a2 = coeffs[4];
+
+      // é€å¸§é€é€šé“å¤„ç†
+      for (let i = 0; i < samplesCount; i += frameSize) {
+        for (let ch = 0; ch < frameSize; ch++) {
+          const sampleIdx = i + ch;
+          if (sampleIdx * 2 + 1 >= bytesRead) break;
+
+          // è¯»å–è¾“å…¥æ ·æœ¬ (S16LE)
+          const x = view.getInt16(sampleIdx * 2, true);
+
+          // Biquad Direct Form I
+          const s0 = this.filterStates[b][ch][0];
+          const s1 = this.filterStates[b][ch][1];
+
+          const y = b0 * x + s0;
+          this.filterStates[b][ch][0] = b1 * x - a1 * y + s1;
+          this.filterStates[b][ch][1] = b2 * x - a2 * y;
+
+          // å†™å› (é™å¹…)
+          const clamped = Math.max(-32768, Math.min(32767, Math.round(y)));
+          view.setInt16(sampleIdx * 2, clamped, true);
+        }
+      }
+    }
+  }
+
+  /**
+   * é‡ç½®ä¸ºé»˜è®¤çŠ¶æ€
+   */
+  reset(): void {
+    this.applyPreset('FLAT');
+    this.isEnabled = false;
+    this.resetFilterStates();
+  }
+}
+ÀÔrD‘¨./LoggerÔrE—ªassertions¨external¢id¤meta±moduleSideEffectsªresolvedByµsyntheticNamedExportsAÂÙAC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\utils\Logger.etsAÃªoh-resolveÂ“ÔrF–§version¤fileªsourceRoot§sources¥names¨mappings¶EqualizerController.js ‘·EqualizerController.etsÜ‘”    ‘” ˜”   ” ”	 	” ” ” ”! !”" "‘”   ‘” !Ü ”  " ” "” "” "!” ""” "$” "&” "(”  "*”# "-”% "/”( "2”* "4”- "7”/ "9”3 "=”5 "?”9 "ÌC”; "ÌE”? "ÌI”ÌA "ÌK”ÌE "ÌO”ÌG "ÌQ”ÌL "ÌV”ÌM "ÌW”ÌN "ÌXÜ ”  # ” #” #” #” #” #!” ##” #'” #)”$ #.”& #0”+ #5”- #7”2 #<”4 #>”8 #ÌB”: #ÌD”> #ÌH”Ì@ #ÌJ”ÌD #ÌN”ÌF #ÌP”ÌJ #ÌT”ÌL #ÌV”ÌQ #Ì[”ÌR #Ì\”ÌS #Ì]‘”  % ‘” (””  ) ” )” )”  ) ‘” 3•” *
+” *” *” *” *•” +
+” +” +” +$” +%•” ,
+” ,” ,(”# ,.”$ ,/•” -
+” -” -” -$”  -%•” .
+” .” .” .” .’” 0”  0•” 1
+” 1” 1'” 1)” 1*–” 4” 4” 4	” 4” 4” 4˜” 5” 5” 5	” 5” 5” 5”  5”! 5’” 6” 6‘” 8‘” :’” ;
+” ;—” <” <” <	” <” <” <” <Ü ” =” =	” =” =” =” =” =” =” =”* =&”+ ='”1 =-”3 =/”4 =0”6 =2”8 =4—” >” >
+” >” >” >” >” >—” ?” ?” ?”) ?!”* ?"”+ ?#”, ?$”” Ì@” Ì@” Ì@” Ì@—” ÌA” ÌA” ÌA”  ÌA”! ÌA”" ÌA”# ÌA“” ÌB” ÌB” ÌB	‘”	 ÌC’” ÌD”4 ÌD0—” ÌE” ÌE” ÌE	” ÌE” ÌE” ÌE” ÌEÜ ” ÌF” ÌF	” ÌF” ÌF” ÌF” ÌF” ÌF” ÌF” ÌF”  ÌF”! ÌF”& ÌF"”' ÌF#”- ÌF)”/ ÌF+”0 ÌF,”2 ÌF.”4 ÌF0—” ÌG” ÌG
+” ÌG” ÌG” ÌG”" ÌG”# ÌG–” ÌH” ÌH	” ÌH
+” ÌH” ÌH” ÌH˜” ÌI” ÌI	” ÌI
+” ÌI” ÌI” ÌI” ÌI” ÌI“” ÌJ” ÌJ” ÌJ	‘”	 ÌK’” ÌL” ÌL‘” ÌN‘” ÌP”” ÌQ” ÌQ” ÌQ” ÌQ—” ÌR” ÌR” ÌR	” ÌR” ÌR” ÌR” ÌR’” ÌS” ÌS‘” ÌU‘” ÌW”” ÌX” ÌX” ÌX” ÌX—” ÌY” ÌY” ÌY	” ÌY” ÌY” ÌY” ÌY’” ÌZ” ÌZ‘” Ì\‘” Ì^’” Ì_” Ì_˜” Ì`” Ì`” Ì`” Ì`” Ì`” Ì`”  Ì`”! Ì`’” Ìa” Ìa‘” Ìc‘” Ìe’” Ìf” Ìf
+–” Ìg” Ìg” Ìg” Ìg” Ìg” Ìg’” Ìh” Ìh‘” Ìj‘” Ìn–” Ìo” Ìo” Ìo” Ìo” Ìo!”! Ìo/” Ìp” Ìp” Ìp” Ìp” Ìp” Ìp”& Ìp"”* Ìp&”. Ìp*”/ Ìp+”4 Ìp0”5 Ìp1”; Ìp7”= Ìp9’” Ìq” Ìq‘”	 ÌrÜ ” Ìs” Ìs
+” Ìs” Ìs”  Ìs”! Ìs”$ Ìs ”% Ìs!”& Ìs"”( Ìs$”* Ìs&”. Ìs*”/ Ìs+”2 Ìs.”3 Ìs/”5 Ìs1”7 Ìs3”= Ìs9”> Ìs:”? Ìs;”Ì@ Ìs<œ” Ìt” Ìt” Ìt	” Ìt” Ìt” Ìt” Ìt” Ìt”" Ìt”% Ìt!”0 Ìt,”1 Ìt-™” Ìu” Ìu” Ìu	” Ìu” Ìu”# Ìu”$ Ìu ”% Ìu!”1 Ìu-Ü ” Ìv” Ìv
+” Ìv” Ìv” Ìv” Ìv”( Ìv$”- Ìv)”1 Ìv-”2 Ìv.”7 Ìv3”8 Ìv4”ÌA Ìv=”ÌB Ìv>”ÌC Ìv?”ÌL ÌvÌH”ÌY ÌvÌU”Ìd ÌvÌ`”Ìh ÌvÌd”Ìi ÌvÌe”Ìj ÌvÌf’” Ìw” Ìw‘” Ìy‘” Ì{’” Ì|” Ì|–” Ì}” Ì}” Ì}” Ì}” Ì}” Ì}’” Ì~” Ì~‘” Ì€‘” Ì‚”” Ìƒ” Ìƒ” Ìƒ” Ìƒ—” Ì„” Ì„” Ì„	” Ì„” Ì„”  Ì„”! Ì„•” Ì…” Ì…” Ì…	” Ì…” Ì…–” Ì†” Ì†
+” Ì†”" Ì†”$ Ì†”% Ì†‘”	 Ì‡Ü ” Ìˆ” Ìˆ
+” Ìˆ” Ìˆ” Ìˆ”! Ìˆ”( Ìˆ$”) Ìˆ%”* Ìˆ&”+ Ìˆ'”4 Ìˆ0”5 Ìˆ1”6 Ìˆ2”7 Ìˆ3”ÌA Ìˆ=”ÌC Ìˆ?”ÌD ÌˆÌ@”ÌE ÌˆÌA’” Ì‰” Ì‰‘” Ì‹‘” Ì’” Ì” Ì–” Ì” Ì” Ì” Ì”! Ì”" Ì’” Ì” Ì‘” Ì’‘” Ì””” Ì•” Ì•” Ì•” Ì•"›” Ì–” Ì–
+” Ì–” Ì–”) Ì–%”* Ì–&”8 Ì–4”9 Ì–5”? Ì–;”Ì@ Ì–<”ÌA Ì–=Ü ” Ì—” Ì—	” Ì—” Ì—” Ì—” Ì—” Ì—” Ì—” Ì—”  Ì—”! Ì—”& Ì—"”' Ì—#”- Ì—)”/ Ì—+”0 Ì—,”2 Ì—.”4 Ì—0Ÿ” Ì˜” Ì˜
+” Ì˜” Ì˜” Ì˜” Ì˜” Ì˜” Ì˜” Ì˜”! Ì˜”& Ì˜ ”' Ì˜!”( Ì˜"”) Ì˜#”* Ì˜$‘”	 Ì™—” Ìš” Ìš” Ìš	” Ìš” Ìš”# Ìš”$ Ìš ™” Ì›” Ì›” Ì›	” Ì›” Ì›” Ì›”$ Ì› ”* Ì›&”+ Ì›'–” Ìœ” Ìœ” Ìœ	” Ìœ”  Ìœ”! Ìœš” Ì” Ì
+” Ì” Ì” Ì”* Ì&”0 Ì,”2 Ì.”3 Ì/”4 Ì0’” Ì” Ì‘” Ì ‘” Ì¢–” Ì£”
+ Ì£” Ì£	” Ì£” Ì£”  Ì£,”” Ì¤” Ì¤” Ì¤” Ì¤“” Ì¥” Ì¥” Ì¥Ü ” Ì¦” Ì¦” Ì¦” Ì¦” Ì¦” Ì¦” Ì¦” Ì¦”! Ì¦”" Ì¦”$ Ì¦”% Ì¦”' Ì¦”( Ì¦ ”* Ì¦"”+ Ì¦#”- Ì¦%”. Ì¦&”0 Ì¦(”1 Ì¦)”3 Ì¦+”4 Ì¦,”5 Ì¦-”6 Ì¦.“” Ì§” Ì§” Ì§’” Ì¨”% Ì¨Ü ” Ì©” Ì©” Ì©” Ì©” Ì©” Ì©” Ì©” Ì©”  Ì©”" Ì©”# Ì©”% Ì©”& Ì©”( Ì© ”) Ì©!”+ Ì©#”, Ì©$”. Ì©&”/ Ì©'”1 Ì©)”2 Ì©*”3 Ì©+”5 Ì©-”6 Ì©.”7 Ì©/”8 Ì©0”9 Ì©1“” Ìª” Ìª” Ìª’” Ì«”) Ì«!Ü ” Ì¬” Ì¬” Ì¬” Ì¬” Ì¬” Ì¬” Ì¬” Ì¬”! Ì¬”" Ì¬”$ Ì¬”% Ì¬”& Ì¬”( Ì¬ ”) Ì¬!”* Ì¬"”, Ì¬$”- Ì¬%”/ Ì¬'”0 Ì¬(”2 Ì¬*”3 Ì¬+”5 Ì¬-”6 Ì¬.”7 Ì¬/”8 Ì¬0“” Ì­” Ì­” Ì­’” Ì®”! Ì®Ü ” Ì¯” Ì¯” Ì¯” Ì¯” Ì¯” Ì¯” Ì¯” Ì¯”! Ì¯”" Ì¯”$ Ì¯”% Ì¯”' Ì¯”( Ì¯ ”* Ì¯"”+ Ì¯#”- Ì¯%”. Ì¯&”0 Ì¯(”1 Ì¯)”3 Ì¯+”4 Ì¯,”5 Ì¯-”6 Ì¯.“” Ì°” Ì°” Ì°’” Ì±”& Ì±Ü ” Ì²” Ì²” Ì²” Ì²” Ì²” Ì²” Ì²” Ì²”! Ì²”" Ì²”$ Ì²”% Ì²”& Ì²”( Ì² ”) Ì²!”* Ì²"”, Ì²$”- Ì²%”/ Ì²'”0 Ì²(”2 Ì²*”3 Ì²+”5 Ì²-”6 Ì².”7 Ì²/”8 Ì²0“” Ì³” Ì³” Ì³’” Ì´”( Ì´ Ü ” Ìµ” Ìµ” Ìµ” Ìµ” Ìµ” Ìµ” Ìµ” Ìµ”  Ìµ”! Ìµ”# Ìµ”$ Ìµ”& Ìµ”' Ìµ”) Ìµ!”* Ìµ"”, Ìµ$”- Ìµ%”/ Ìµ'”0 Ìµ(”2 Ìµ*”3 Ìµ+”5 Ìµ-”6 Ìµ.”7 Ìµ/”8 Ìµ0”9 Ìµ1“” Ì¶” Ì¶” Ì¶’” Ì·” Ì·Ü ” Ì¸” Ì¸” Ì¸” Ì¸” Ì¸” Ì¸” Ì¸” Ì¸”! Ì¸”" Ì¸”$ Ì¸”% Ì¸”' Ì¸”( Ì¸ ”* Ì¸"”+ Ì¸#”- Ì¸%”. Ì¸&”0 Ì¸(”1 Ì¸)”3 Ì¸+”4 Ì¸,”5 Ì¸-”6 Ì¸.“” Ì¹” Ì¹” Ì¹’” Ìº” ÌºÜ ” Ì»” Ì»” Ì»” Ì»” Ì»” Ì»” Ì»” Ì»”! Ì»”" Ì»”$ Ì»”% Ì»”' Ì»”( Ì» ”* Ì»"”+ Ì»#”- Ì»%”. Ì»&”0 Ì»(”1 Ì»)”3 Ì»+”4 Ì»,”5 Ì»-”6 Ì».‘” Ì¼Ü ” Ì½” Ì½” Ì½” Ì½” Ì½” Ì½” Ì½” Ì½”! Ì½”" Ì½”$ Ì½”% Ì½”' Ì½”( Ì½ ”* Ì½"”+ Ì½#”- Ì½%”. Ì½&”0 Ì½(”1 Ì½)”3 Ì½+”4 Ì½,”5 Ì½-”6 Ì½.‘”	 Ì¾’” Ì¿” Ì¿‘” ÌÁ‘” ÌÃ”” ÌÄ”
+ ÌÄ” ÌÄ	” ÌÄÜ ” ÌÅ” ÌÅ” ÌÅ” ÌÅ” ÌÅ” ÌÅ” ÌÅ”% ÌÅ!”' ÌÅ#”- ÌÅ)”/ ÌÅ+”: ÌÅ6”< ÌÅ8”ÌC ÌÅ?”ÌE ÌÅÌA”ÌQ ÌÅÌM”ÌS ÌÅÌO”Ìa ÌÅÌ]”Ìb ÌÅÌ^”Ìc ÌÅÌ_’” ÌÆ” ÌÆ‘” ÌÈ‘” ÌÊ–” ÌË”
+ ÌË” ÌË	” ÌË”  ÌË”& ÌË2”” ÌÌ” ÌÌ” ÌÌ” ÌÌ˜” ÌÍ” ÌÍ” ÌÍ” ÌÍ” ÌÍ”  ÌÍ”$ ÌÍ”% ÌÍ˜” ÌÎ” ÌÎ” ÌÎ” ÌÎ” ÌÎ” ÌÎ”# ÌÎ”$ ÌÎ˜” ÌÏ” ÌÏ” ÌÏ” ÌÏ” ÌÏ”  ÌÏ”$ ÌÏ”% ÌÏ˜” ÌĞ” ÌĞ” ÌĞ” ÌĞ” ÌĞ”  ÌĞ”$ ÌĞ”% ÌĞ˜” ÌÑ” ÌÑ” ÌÑ” ÌÑ” ÌÑ”% ÌÑ”) ÌÑ#”* ÌÑ$˜” ÌÒ” ÌÒ” ÌÒ” ÌÒ” ÌÒ”! ÌÒ”% ÌÒ”& ÌÒ ˜” ÌÓ” ÌÓ” ÌÓ” ÌÓ” ÌÓ”& ÌÓ ”, ÌÓ&”- ÌÓ'˜” ÌÔ” ÌÔ” ÌÔ”  ÌÔ”! ÌÔ”( ÌÔ"”. ÌÔ(”/ ÌÔ)—” ÌÕ” ÌÕ” ÌÕ” ÌÕ” ÌÕ”  ÌÕ”! ÌÕ‘”	 ÌÖ’” Ì×” Ì×‘” ÌÙ‘” ÌÛ’” ÌÜ
+” ÌÜÜ ” Ìİ” Ìİ	” Ìİ” Ìİ” Ìİ” Ìİ” Ìİ” Ìİ” Ìİ”  Ìİ”! Ìİ”- Ìİ)”. Ìİ*”4 Ìİ0”6 Ìİ2”7 Ìİ3”9 Ìİ5”; Ìİ7Ü ” ÌŞ” ÌŞ” ÌŞ” ÌŞ” ÌŞ” ÌŞ” ÌŞ” ÌŞ”" ÌŞ”& ÌŞ ”' ÌŞ!”3 ÌŞ-”4 ÌŞ.”5 ÌŞ/”6 ÌŞ0”7 ÌŞ1”= ÌŞ7”? ÌŞ9”ÌA ÌŞ;”ÌC ÌŞ=”ÌE ÌŞ?Ü ” Ìß” Ìß” Ìß”! Ìß”" Ìß”# Ìß”$ Ìß”% Ìß”' Ìß”( Ìß ”) Ìß!”* Ìß"”+ Ìß#”. Ìß&”/ Ìß'”0 Ìß(Ü ” Ìà” Ìà” Ìà”! Ìà”" Ìà”# Ìà”$ Ìà”% Ìà”' Ìà”( Ìà ”) Ìà!”* Ìà"”+ Ìà#”. Ìà&”/ Ìà'”0 Ìà(‘” Ìá‘”	 Ìâ’” Ìã” Ìã‘” Ìå‘” Ìè–” Ìé
+” Ìé” Ìé” Ìé,”  Ìé.”& Ìé<Ü ” Ìê” Ìê
+” Ìê” Ìê” Ìê” Ìê” Ìê” Ìê” Ìê” Ìê”% Ìê!”( Ìê$”* Ìê&”+ Ìê'”, Ìê(”- Ìê)”ÌC Ìê?˜” Ìë” Ìë
+” Ìë” Ìë” Ìë” Ìë” Ìë”2 Ìë.Ü ” Ìì” Ìì
+” Ìì” Ìì” Ìì” Ìì” Ìì” Ìì” Ìì”! Ìì”* Ìì&”- Ìì)”1 Ìì-”2 Ìì.”< Ìì8”= Ìì9›” Ìí” Ìí
+” Ìí” Ìí” Ìí” Ìí” Ìí” Ìí”! Ìí”" Ìí”# Ìí›” Ìî” Ìî
+” Ìî” Ìî” Ìî” Ìî” Ìî” Ìî”! Ìî”" Ìî”# Ìîœ” Ìï” Ìï
+” Ìï” Ìï” Ìï” Ìï” Ìï”  Ìï”# Ìï”$ Ìï ”% Ìï!”& Ìï"š” Ìñ” Ìñ
+” Ìñ” Ìñ” Ìñ” Ìñ” Ìñ” Ìñ”  Ìñ”! Ìñ™” Ìò” Ìò
+” Ìò” Ìò” Ìò” Ìò” Ìò” Ìò” Ìòš” Ìó” Ìó
+” Ìó” Ìó” Ìó” Ìó” Ìó” Ìó”  Ìó”! Ìóš” Ìô” Ìô
+” Ìô” Ìô” Ìô” Ìô” Ìô” Ìô”  Ìô”! Ìô™” Ìõ” Ìõ
+” Ìõ” Ìõ” Ìõ” Ìõ” Ìõ” Ìõ” Ìõš” Ìö” Ìö
+” Ìö” Ìö” Ìö” Ìö” Ìö” Ìö”  Ìö”! Ìö’” Ìø” ÌøÜ ” Ìù” Ìù” Ìù” Ìù” Ìù” Ìù” Ìù” Ìù” Ìù”  Ìù”" Ìù”$ Ìù ”' Ìù#”) Ìù%”+ Ìù'”- Ìù)”0 Ìù,”2 Ìù.”4 Ìù0”6 Ìù2”9 Ìù5”; Ìù7”< Ìù8”= Ìù9’” Ìú” Ìú‘” Ìü‘” Í–” Í” Í” Í” Í$” Í&”$ Í7›” Í” Í” Í	” Í” Í” Í” Í”( Í$”, Í(”- Í)”/ Í+’” Í” Í‘”	 Í’” Í” Í–” Í	” Í	” Í	” Í	” Í	” Í	Ü ” Í
+” Í
+	” Í
+” Í
+” Í
+” Í
+” Í
+” Í
+” Í
+”  Í
+”! Í
+”& Í
+"”' Í
+#”- Í
+)”/ Í
++”0 Í
+,”2 Í
+.”4 Í
+0Ü ” Í” Í
+” Í” Í” Í” Í” Í” Í”# Í”$ Í”% Í”& Í ”' Í!”+ Í%”, Í&”/ Í)”2 Í,”4 Í.•” Í” Í” Í” Í” Í’” Í” Í‘” Í‘”	 Í•” Í” Í” Í	” Í” Í’” Í” Í‘”	 Íš” Í” Í
+” Í” Í” Í”! Í”" Í”( Í$”) Í%”* Í&Ÿ” Í” Í
+” Í” Í”! Í”" Í”' Í#”( Í$”1 Í-”4 Í0”5 Í1”6 Í2”7 Í3”8 Í4”ÌU ÍÌQš” Í” Í
+” Í” Í” Í” Í”' Í#”( Í$”) Í%”= Í9’” Í” ÍÜ ” Í” Í	” Í” Í” Í” Í” Í” Í” Í”  Í”! Í”& Í"”' Í#”- Í)”/ Í+”0 Í,”2 Í.”4 Í0” Í” Í” Í” Í” Í” Í”# Í”$ Í”% Í”& Í ”' Í!”+ Í%”, Í&›” Í” Í
+” Í” Í” Í” Í” Í” Í”! Í”$ Í”& Í ”” Í” Í” Í”& Í‘” ÍÜ ” Í” Í” Í” Í” Í”  Í”0 Í*”1 Í+”5 Í/”6 Í0”; Í5”< Í6”= Í7”> Í8”? Í9”ÌH ÍÌB”ÌJ ÍÌD”ÌN ÍÌH”ÌO ÍÌI”ÌP ÍÌJ™” Í ” Í ” Í ” Í ” Í ” Í ” Í ”  Í ”! Í ™” Í!” Í!” Í!” Í!” Í!” Í!” Í!”  Í!”! Í!™” Í"” Í"” Í"” Í"” Í"” Í"” Í"”  Í"”! Í"™” Í#” Í#” Í#” Í#” Í#” Í#” Í#”  Í#”! Í#™” Í$” Í$” Í$” Í$” Í$” Í$” Í$”  Í$”! Í$’” Í&” Í&Ÿ” Í'” Í'” Í'” Í'” Í'” Í'” Í'” Í'”  Í'”, Í'&”. Í'(”/ Í')”3 Í'-”< Í'6”> Í'8” Í(” Í(” Í(” Í(” Í(” Í(”! Í(”# Í(”& Í(”/ Í('”1 Í()”3 Í(+”5 Í(-”7 Í(/˜” Í)
+” Í)”# Í)”& Í)”' Í)”* Í) ”, Í)"”- Í)#™” Í*
+” Í*”! Í*”$ Í*”% Í*”( Í*”) Í*”- Í*#”6 Í*,’” Í*.” Í*4’” Í,
+”% Í,Ÿ” Í-
+” Í-” Í-” Í-”" Í-”# Í-”+ Í-!”, Í-"”5 Í-+”8 Í-.”9 Í-/”; Í-1”? Í-5”Ì@ Í-6”ÌA Í-7’” Í/
+”+ Í/!Ü ” Í0
+” Í0” Í0” Í0”# Í0”$ Í0”0 Í0&”1 Í0'”2 Í0(”3 Í0)”4 Í0*”6 Í0,”7 Í0-”8 Í0.”9 Í0/”: Í00”; Í01Ü ” Í1
+” Í1” Í1” Í1”# Í1”$ Í1”0 Í1&”1 Í1'”2 Í1(”3 Í1)”4 Í1*”6 Í1,”7 Í1-”8 Í1.”9 Í1/”: Í10”; Í11š” Í3
+” Í3” Í3” Í3”  Í3”# Í3”$ Í3”' Í3”) Í3”* Í3 Ü ” Í4
+” Í4” Í4”% Í4”& Í4”' Í4”( Í4”) Í4”+ Í4!”, Í4"”- Í4#”. Í4$”/ Í4%”2 Í4(”4 Í4*”7 Í4-”8 Í4.”; Í41”= Í43”Ì@ Í46”ÌA Í47”ÌD Í4:”ÌF Í4<”ÌG Í4=Ü ” Í5
+” Í5” Í5”% Í5”& Í5”' Í5”( Í5”) Í5”+ Í5!”, Í5"”- Í5#”. Í5$”/ Í5%”2 Í5(”4 Í5*”7 Í5-”8 Í5.”; Í51”= Í53”Ì@ Í56”ÌA Í57”ÌB Í58’” Í7
+” Í7Ü ” Í8
+” Í8”! Í8”$ Í8”( Í8”) Í8”, Í8"”- Í8#”. Í8$”3 Í8)”5 Í8+”9 Í8/”: Í80”= Í83”> Í84”ÌC Í89”ÌE Í8;”ÌI Í8?”ÌJ Í8Ì@”ÌO Í8ÌE”ÌP Í8ÌF”ÌQ Í8ÌG”ÌR Í8ÌH”ÌS Í8ÌI”ÌT Í8ÌJ”ÌU Í8ÌK” Í9
+” Í9” Í9”! Í9”" Í9”+ Í9!”. Í9$”/ Í9%”1 Í9'”8 Í9.”: Í90”> Í94”? Í95”Ì@ Í96‘” Í:	‘” Í;‘”	 Í<’” Í=” Í=‘” Í?‘” ÍA’” ÍB”	 ÍB˜” ÍC” ÍC” ÍC	” ÍC” ÍC” ÍC”  ÍC”! ÍC—” ÍD” ÍD” ÍD	” ÍD” ÍD” ÍD” ÍD–” ÍE” ÍE” ÍE	” ÍE”  ÍE”! ÍE’” ÍF” ÍF‘” ÍGÔrG–§version¤file§sources®sourcesContent¥names¨mappingsÀ‘À‘ÀÜ‘”    ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”  	 ‘”  
+ ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”    ‘”  ! ‘”  " ‘”  # ‘”  $ ‘”  % ‘”  & ‘”  ' ‘”  ( ‘”  ) ‘”  * ‘”  + ‘”  , ‘”  - ‘”  . ‘”  / ‘”  0 ‘”  1 ‘”  2 ‘”  3 ‘”  4 ‘”  5 ‘”  6 ‘”  7 ‘”  8 ‘”  9 ‘”  : ‘”  ; ‘”  < ‘”  = ‘”  > ‘”  ? ‘”  Ì@ ‘”  ÌA ‘”  ÌB ‘”  ÌC ‘”  ÌD ‘”  ÌE ‘”  ÌF ‘”  ÌG ‘”  ÌH ‘”  ÌI ‘”  ÌJ ‘”  ÌK ‘”  ÌL ‘”  ÌM ‘”  ÌN ‘”  ÌO ‘”  ÌP ‘”  ÌQ ‘”  ÌR ‘”  ÌS ‘”  ÌT ‘”  ÌU ‘”  ÌV ‘”  ÌW ‘”  ÌX ‘”  ÌY ‘”  ÌZ ‘”  Ì[ ‘”  Ì\ ‘”  Ì] ‘”  Ì^ ‘”  Ì_ ‘”  Ì` ‘”  Ìa ‘”  Ìb ‘”  Ìc ‘”  Ìd ‘”  Ìe ‘”  Ìf ‘”  Ìg ‘”  Ìh ‘”  Ìi ‘”  Ìj ‘”  Ìk ‘”  Ìl ‘”  Ìm ‘”  Ìn ‘”  Ìo ‘”  Ìp ‘”  Ìq ‘”  Ìr ‘”  Ìs ‘”  Ìt ‘”  Ìu ‘”  Ìv ‘”  Ìw ‘”  Ìx ‘”  Ìy ‘”  Ìz ‘”  Ì{ ‘”  Ì| ‘”  Ì} ‘”  Ì~ ‘”  Ì ‘”  Ì€ ‘”  Ì ‘”  Ì‚ ‘”  Ìƒ ‘”  Ì„ ‘”  Ì… ‘”  Ì† ‘”  Ì‡ ‘”  Ìˆ ‘”  Ì‰ ‘”  ÌŠ ‘”  Ì‹ ‘”  ÌŒ ‘”  Ì ‘”  Ì ‘”  Ì ‘”  Ì ‘”  Ì‘ ‘”  Ì’ ‘”  Ì“ ‘”  Ì” ‘”  Ì• ‘”  Ì– ‘”  Ì— ‘”  Ì˜ ‘”  Ì™ ‘”  Ìš ‘”  Ì› ‘”  Ìœ ‘”  Ì ‘”  Ì ‘”  ÌŸ ‘”  Ì  ‘”  Ì¡ ‘”  Ì¢ ‘”  Ì£ ‘”  Ì¤ ‘”  Ì¥ ‘”  Ì¦ ‘”  Ì§ ‘”  Ì¨ ‘”  Ì© ‘”  Ìª ‘”  Ì« ‘”  Ì¬ ‘”  Ì­ ‘”  Ì® ‘”  Ì¯ ‘”  Ì° ‘”  Ì± ‘”  Ì² ‘”  Ì³ ‘”  Ì´ ‘”  Ìµ ‘”  Ì¶ ‘”  Ì· ‘”  Ì¸ ‘”  Ì¹ ‘”  Ìº ‘”  Ì» ‘”  Ì¼ ‘”  Ì½ ‘”  Ì¾ ‘”  Ì¿ ‘”  ÌÀ ‘”  ÌÁ ‘”  ÌÂ ‘”  ÌÃ ‘”  ÌÄ ‘”  ÌÅ ‘”  ÌÆ ‘”  ÌÇ ‘”  ÌÈ ‘”  ÌÉ ‘”  ÌÊ ‘”  ÌË ‘”  ÌÌ ‘”  ÌÍ ‘”  ÌÎ ‘”  ÌÏ ‘”  ÌĞ ‘”  ÌÑ ‘”  ÌÒ ‘”  ÌÓ ‘”  ÌÔ ‘”  ÌÕ ‘”  ÌÖ ‘”  Ì× ‘”  ÌØ ‘”  ÌÙ ‘”  ÌÚ ‘”  ÌÛ ‘”  ÌÜ ‘”  Ìİ ‘”  ÌŞ ‘”  Ìß ‘”  Ìà ‘”  Ìá ‘”  Ìâ ‘”  Ìã ‘”  Ìä ‘”  Ìå ‘”  Ìæ ‘”  Ìç ‘”  Ìè ‘”  Ìé ‘”  Ìê ‘”  Ìë ‘”  Ìì ‘”  Ìí ‘”  Ìî ‘”  Ìï ‘”  Ìğ ‘”  Ìñ ‘”  Ìò ‘”  Ìó ‘”  Ìô ‘”  Ìõ ‘”  Ìö ‘”  Ì÷ ‘”  Ìø ‘”  Ìù ‘”  Ìú ‘”  Ìû ‘”  Ìü ‘”  Ìı ‘”  Ìş ‘”  Ìÿ ‘”  Í  ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í	 ‘”  Í
+ ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ÔrH’§missing¦pluginÃ¦genAbcÂÔ  ÔrI”²dynamicImportCache¹exportAllDeclarationCache»exportNamedDeclarationCache«importCache‘ÔrJ–¤type¥start£end«declarationªspecifiers¦source¶ExportNamedDeclarationÍŠÍ"°ÔrK–¤type¥start£end¢idªsuperClass¤body°ClassDeclarationÍ‘Í"°ÔrL”¤type¥start£end¤nameªIdentifierÍ—Íª³EqualizerControllerÀÔrM”¤type¥start£end¤body©ClassBodyÍ«Í"°Ü ÔrN˜¤type¥start£end¦static¨computed£key¤kind¥value°MethodDefinitionÍ²ÍèÂÂLªIdentifierÍ²Í½«constructor«constructorÔrO™¤type¥start£end¢idªexpression©generator¥async¦params¤body²FunctionExpressionÍ½ÍèÀÂÂÂM®BlockStatementÍÀÍè˜ÔrP”¤type¥start£endªexpression³ExpressionStatementÍËÍÛÔrQ–¤type¥start£end¨operator¤left¥right´AssignmentExpressionÍËÍÚ¡=ÔrR—¤type¥start£end¦object¨property¨computed¨optional°MemberExpressionÍËÍÕÔrS“¤type¥start£end®ThisExpressionÍËÍÏLªIdentifierÍĞÍÕ¥bandsÂÂÔrT”¤type¥start£end¨elements¯ArrayExpressionÍØÍÚP³ExpressionStatementÍåÍüQ´AssignmentExpressionÍåÍû¡=R°MemberExpressionÍåÍóS®ThisExpressionÍåÍéLªIdentifierÍêÍó©isEnabledÂÂÔrU•¤type¥start£end¥value£raw§LiteralÍöÍûÂ¥falseP³ExpressionStatementÍÍ"Q´AssignmentExpressionÍÍ!¡=R°MemberExpressionÍÍS®ThisExpressionÍÍ
+LªIdentifierÍÍ­currentPresetÂÂU§LiteralÍÍ!¤FLAT¦'FLAT'P³ExpressionStatementÍ,ÍDQ´AssignmentExpressionÍ,ÍC¡=R°MemberExpressionÍ,Í;S®ThisExpressionÍ,Í0LªIdentifierÍ1Í;ªsampleRateÂÂU§LiteralÍ>ÍCÍ»€¥48000P³ExpressionStatementÍNÍ`Q´AssignmentExpressionÍNÍ_¡=R°MemberExpressionÍNÍ[S®ThisExpressionÍNÍRLªIdentifierÍSÍ[¨channelsÂÂU§LiteralÍ^Í_¡2P³ExpressionStatementÍŒÍ£Q´AssignmentExpressionÍŒÍ¢¡=R°MemberExpressionÍŒÍS®ThisExpressionÍŒÍLªIdentifierÍ‘Í¬filterStatesÂÂT¯ArrayExpressionÍ Í¢P³ExpressionStatementÍ­Í¾ÔrV–¤type¥start£end¦callee©arguments¨optional®CallExpressionÍ­Í½R°MemberExpressionÍ­Í»S®ThisExpressionÍ­Í±LªIdentifierÍ²Í»©initBandsÂÂÂP³ExpressionStatementÍÈÍáV®CallExpressionÍÈÍàR°MemberExpressionÍÈÍØS®ThisExpressionÍÈÍÌLªIdentifierÍÍÍØ«applyPresetÂÂ‘U§LiteralÍÙÍß¤FLAT¦'FLAT'ÂN°MethodDefinitionÍÍ(ÂÂLªIdentifierÍÍ©initBands¦methodO²FunctionExpressionÍÍ(ÀÂÂÂM®BlockStatementÍÍ(”P³ExpressionStatementÍ%Í5Q´AssignmentExpressionÍ%Í4¡=R°MemberExpressionÍ%Í/S®ThisExpressionÍ%Í)LªIdentifierÍ*Í/¥bandsÂÂT¯ArrayExpressionÍ2Í4ÔrW—¤type¥start£end¤init¤test¦update¤body¬ForStatementÍ?ÍÔrX•¤type¥start£end¬declarations¤kind³VariableDeclarationÍDÍM‘ÔrY•¤type¥start£end¢id¤init²VariableDeclaratorÍHÍMLªIdentifierÍHÍI¡iU§LiteralÍLÍM ¡0£letÔrZ–¤type¥start£end¤left¨operator¥right°BinaryExpressionÍOÍhLªIdentifierÍOÍP¡i¡<R°MemberExpressionÍSÍhLªIdentifierÍSÍa®EQ_FREQUENCIESLªIdentifierÍbÍh¦lengthÂÂÔr[–¤type¥start£end¨operator¦prefix¨argument°UpdateExpressionÍjÍm¢++ÂLªIdentifierÍjÍk¡iM®BlockStatementÍoÍ‘P³ExpressionStatementÍ~ÍV®CallExpressionÍ~ÍR°MemberExpressionÍ~ÍR°MemberExpressionÍ~ÍˆS®ThisExpressionÍ~Í‚LªIdentifierÍƒÍˆ¥bandsÂÂLªIdentifierÍ‰Í¤pushÂÂ‘Ôr\”¤type¥start£endªproperties°ObjectExpressionÍÍ“Ôr]™¤type¥start£end¦method©shorthand¨computed£key¥value¤kind¨PropertyÍ¡Í½ÂÂÂLªIdentifierÍ¡Íª©frequencyR°MemberExpressionÍ¬Í½LªIdentifierÍ¬Íº®EQ_FREQUENCIESLªIdentifierÍ»Í¼¡iÃÂ¤init]¨PropertyÍĞÍ×ÂÂÂLªIdentifierÍĞÍÔ¤gainU§LiteralÍÖÍ× ¡0¤init]¨PropertyÍêÍıÂÂÂLªIdentifierÍêÍï¥labelR°MemberExpressionÍñÍıLªIdentifierÍñÍú©EQ_LABELSLªIdentifierÍûÍü¡iÃÂ¤initÂP³ExpressionStatementÍYÍpQ´AssignmentExpressionÍYÍo¡=R°MemberExpressionÍYÍjS®ThisExpressionÍYÍ]LªIdentifierÍ^Íj¬filterStatesÂÂT¯ArrayExpressionÍmÍoW¬ForStatementÍzÍ!X³VariableDeclarationÍÍˆ‘Y²VariableDeclaratorÍƒÍˆLªIdentifierÍƒÍ„¡iU§LiteralÍ‡Íˆ ¡0£letZ°BinaryExpressionÍŠÍŸLªIdentifierÍŠÍ‹¡i¡<R°MemberExpressionÍÍŸR°MemberExpressionÍÍ˜S®ThisExpressionÍÍ’LªIdentifierÍ“Í˜¥bandsÂÂLªIdentifierÍ™ÍŸ¦lengthÂÂ[°UpdateExpressionÍ¡Í¤¢++ÂLªIdentifierÍ¡Í¢¡iM®BlockStatementÍ¦Í!‘P³ExpressionStatementÍµÍV®CallExpressionÍµÍR°MemberExpressionÍµÍËR°MemberExpressionÍµÍÆS®ThisExpressionÍµÍ¹LªIdentifierÍºÍÆ¬filterStatesÂÂLªIdentifierÍÇÍË¤pushÂÂ‘T¯ArrayExpressionÍÌÍ’T¯ArrayExpressionÍßÍå’U§LiteralÍàÍá ¡0U§LiteralÍãÍä ¡0T¯ArrayExpressionÍøÍş’U§LiteralÍùÍú ¡0U§LiteralÍüÍı ¡0ÂN°MethodDefinitionÍNÍ‹ÂÂLªIdentifierÍNÍ[­setSampleRate¦methodO²FunctionExpressionÍ[Í‹ÀÂÂÂ‘LªIdentifierÍ\Í`¤rateM®BlockStatementÍbÍ‹‘P³ExpressionStatementÍmÍ„Q´AssignmentExpressionÍmÍƒ¡=R°MemberExpressionÍmÍ|S®ThisExpressionÍmÍqLªIdentifierÍrÍ|ªsampleRateÂÂLªIdentifierÍÍƒ¤rateN°MethodDefinitionÍ±ÍæÂÂLªIdentifierÍ±Í¼«setChannels¦methodO²FunctionExpressionÍ¼ÍæÀÂÂÂ‘LªIdentifierÍ½Í¿¢chM®BlockStatementÍÁÍæ‘P³ExpressionStatementÍÌÍßQ´AssignmentExpressionÍÌÍŞ¡=R°MemberExpressionÍÌÍÙS®ThisExpressionÍÌÍĞLªIdentifierÍÑÍÙ¨channelsÂÂLªIdentifierÍÜÍŞ¢chN°MethodDefinitionÍÍGÂÂLªIdentifierÍÍ¬getBandCount¦methodO²FunctionExpressionÍÍGÀÂÂÂM®BlockStatementÍÍG‘Ôr^”¤type¥start£end¨argument¯ReturnStatementÍ'Í@R°MemberExpressionÍ.Í?R°MemberExpressionÍ.Í8S®ThisExpressionÍ.Í2LªIdentifierÍ3Í8¥bandsÂÂLªIdentifierÍ9Í?¦lengthÂÂN°MethodDefinitionÍnÍÂÂLªIdentifierÍnÍv¨getBands¦methodO²FunctionExpressionÍvÍÀÂÂÂM®BlockStatementÍyÍ‘^¯ReturnStatementÍ„Í–R°MemberExpressionÍ‹Í•S®ThisExpressionÍ‹ÍLªIdentifierÍÍ•¥bandsÂÂN°MethodDefinitionÍ	Í
+³ÂÂLªIdentifierÍ	Í	#«setBandGain¦methodO²FunctionExpressionÍ	#Í
+³ÀÂÂÂ’LªIdentifierÍ	$Í	-©bandIndexLªIdentifierÍ	/Í	5¦gainDbM®BlockStatementÍ	7Í
+³•Ôr_–¤type¥start£end¤testªconsequent©alternate«IfStatementÍ	BÍ	˜Z±LogicalExpressionÍ	FÍ	uZ°BinaryExpressionÍ	FÍ	SLªIdentifierÍ	FÍ	O©bandIndex¡<U§LiteralÍ	RÍ	S ¡0¢||Z°BinaryExpressionÍ	WÍ	uLªIdentifierÍ	WÍ	`©bandIndex¢>=R°MemberExpressionÍ	dÍ	uR°MemberExpressionÍ	dÍ	nS®ThisExpressionÍ	dÍ	hLªIdentifierÍ	iÍ	n¥bandsÂÂLªIdentifierÍ	oÍ	u¦lengthÂÂM®BlockStatementÍ	wÍ	˜‘^¯ReturnStatementÍ	†Í	ÀÀX³VariableDeclarationÍ	¢Í	Ú‘Y²VariableDeclaratorÍ	¨Í	ÙLªIdentifierÍ	¨Í	³«clampedGainV®CallExpressionÍ	¶Í	ÙR°MemberExpressionÍ	¶Í	¾LªIdentifierÍ	¶Í	º¤MathLªIdentifierÍ	»Í	¾£maxÂÂ’[¯UnaryExpressionÍ	¿Í	Â¡-ÃU§LiteralÍ	ÀÍ	Â¢12V®CallExpressionÍ	ÄÍ	ØR°MemberExpressionÍ	ÄÍ	ÌLªIdentifierÍ	ÄÍ	È¤MathLªIdentifierÍ	ÉÍ	Ì£minÂÂ’U§LiteralÍ	ÍÍ	Ï¢12LªIdentifierÍ	ÑÍ	×¦gainDbÂÂ¥constP³ExpressionStatementÍ	äÍ
+Q´AssignmentExpressionÍ	äÍ
+¡=R°MemberExpressionÍ	äÍ	şR°MemberExpressionÍ	äÍ	ùR°MemberExpressionÍ	äÍ	îS®ThisExpressionÍ	äÍ	èLªIdentifierÍ	éÍ	î¥bandsÂÂLªIdentifierÍ	ïÍ	ø©bandIndexÃÂLªIdentifierÍ	úÍ	ş¤gainÂÂLªIdentifierÍ
+Í
+«clampedGainP³ExpressionStatementÍ
+Í
+3Q´AssignmentExpressionÍ
+Í
+2¡=R°MemberExpressionÍ
+Í
+)S®ThisExpressionÍ
+Í
+LªIdentifierÍ
+Í
+)­currentPresetÂÂU§LiteralÍ
+,Í
+2¤FLAT¦'FLAT'P³ExpressionStatementÍ
+JÍ
+¬V®CallExpressionÍ
+JÍ
+«R°MemberExpressionÍ
+JÍ
+ULªIdentifierÍ
+JÍ
+P¦LoggerLªIdentifierÍ
+QÍ
+U¤infoÂÂ‘Ôr`•¤type¥start£end«expressions¦quasis¯TemplateLiteralÍ
+VÍ
+ª“LªIdentifierÍ
+aÍ
+j©bandIndexR°MemberExpressionÍ
+oÍ
+R°MemberExpressionÍ
+oÍ
+„R°MemberExpressionÍ
+oÍ
+yS®ThisExpressionÍ
+oÍ
+sLªIdentifierÍ
+tÍ
+y¥bandsÂÂLªIdentifierÍ
+zÍ
+ƒ©bandIndexÃÂLªIdentifierÍ
+…Í
+©frequencyÂÂLªIdentifierÍ
+›Í
+¦«clampedGain”Ôra•¤type¥start£end¥value¤tail¯TemplateElementÍ
+WÍ
+_Ôrb’£raw¦cooked¨EQ band ¨EQ band Âa¯TemplateElementÍ
+kÍ
+mb¢ (¢ (Âa¯TemplateElementÍ
+Í
+™bªHz) gain: ªHz) gain: Âa¯TemplateElementÍ
+§Í
+©b¢dB¢dBÃÂN°MethodDefinitionÍ
+İÍÂÂLªIdentifierÍ
+İÍ
+çªgetEnabled¦methodO²FunctionExpressionÍ
+çÍÀÂÂÂM®BlockStatementÍ
+êÍ‘^¯ReturnStatementÍ
+õÍR°MemberExpressionÍ
+üÍ
+S®ThisExpressionÍ
+üÍ LªIdentifierÍÍ
+©isEnabledÂÂN°MethodDefinitionÍ<ÍÂÂLªIdentifierÍ<ÍFªsetEnabled¦methodO²FunctionExpressionÍFÍÀÂÂÂ‘LªIdentifierÍGÍN§enabledM®BlockStatementÍPÍ“P³ExpressionStatementÍ[ÍtQ´AssignmentExpressionÍ[Ís¡=R°MemberExpressionÍ[ÍiS®ThisExpressionÍ[Í_LªIdentifierÍ`Íi©isEnabledÂÂLªIdentifierÍlÍs§enabled_«IfStatementÍ~Í¿[¯UnaryExpressionÍ‚ÍŠ¡!ÃLªIdentifierÍƒÍŠ§enabledM®BlockStatementÍŒÍ¿‘P³ExpressionStatementÍ›Í´V®CallExpressionÍ›Í³R°MemberExpressionÍ›Í±S®ThisExpressionÍ›ÍŸLªIdentifierÍ Í±±resetFilterStatesÂÂÂÀP³ExpressionStatementÍÉÍV®CallExpressionÍÉÍR°MemberExpressionÍÉÍÔLªIdentifierÍÉÍÏ¦LoggerLªIdentifierÍĞÍÔ¤infoÂÂ‘`¯TemplateLiteralÍÕÍ‘_µConditionalExpressionÍâÍLªIdentifierÍâÍé§enabledU§LiteralÍìÍõ§enabled©'enabled'U§LiteralÍøÍ¨disabledª'disabled'’a¯TemplateElementÍÖÍàbªEqualizer ªEqualizer Âa¯TemplateElementÍÍb  ÃÂN°MethodDefinitionÍ6ÍnÂÂLªIdentifierÍ6Í?©getPreset¦methodO²FunctionExpressionÍ?ÍnÀÂÂÂM®BlockStatementÍBÍn‘^¯ReturnStatementÍMÍgR°MemberExpressionÍTÍfS®ThisExpressionÍTÍXLªIdentifierÍYÍf­currentPresetÂÂN°MethodDefinitionÍ“ÍÂÂLªIdentifierÍ“Í«applyPreset¦methodO²FunctionExpressionÍÍÀÂÂÂ‘LªIdentifierÍŸÍ¥¦presetM®BlockStatementÍ§Í–X³VariableDeclarationÍ²Íë‘Y²VariableDeclaratorÍ¸ÍêLªIdentifierÍ¸Í½¥gainsV®CallExpressionÍÀÍêR°MemberExpressionÍÀÍâLªIdentifierÍÀÍÓ³EqualizerControllerLªIdentifierÍÔÍâ®getPresetGainsÂÂ‘LªIdentifierÍãÍé¦presetÂ¥constW¬ForStatementÍõÍYX³VariableDeclarationÍúÍ‘Y²VariableDeclaratorÍşÍLªIdentifierÍşÍÿ¡iU§LiteralÍÍ ¡0£letZ°BinaryExpressionÍÍLªIdentifierÍÍ¡i¡<R°MemberExpressionÍ	ÍR°MemberExpressionÍ	ÍS®ThisExpressionÍ	ÍLªIdentifierÍÍ¥bandsÂÂLªIdentifierÍÍ¦lengthÂÂ[°UpdateExpressionÍÍ¢++ÂLªIdentifierÍÍ¡iM®BlockStatementÍ!ÍY‘P³ExpressionStatementÍ0ÍNQ´AssignmentExpressionÍ0ÍM¡=R°MemberExpressionÍ0ÍBR°MemberExpressionÍ0Í=R°MemberExpressionÍ0Í:S®ThisExpressionÍ0Í4LªIdentifierÍ5Í:¥bandsÂÂLªIdentifierÍ;Í<¡iÃÂLªIdentifierÍ>ÍB¤gainÂÂR°MemberExpressionÍEÍMLªIdentifierÍEÍJ¥gainsLªIdentifierÍKÍL¡iÃÂP³ExpressionStatementÍcÍQ´AssignmentExpressionÍcÍ~¡=R°MemberExpressionÍcÍuS®ThisExpressionÍcÍgLªIdentifierÍhÍu­currentPresetÂÂLªIdentifierÍxÍ~¦presetP³ExpressionStatementÍ‰Í¬Q´AssignmentExpressionÍ‰Í«¡=R°MemberExpressionÍ‰Í—S®ThisExpressionÍ‰ÍLªIdentifierÍÍ—©isEnabledÂÂZ°BinaryExpressionÍšÍ«LªIdentifierÍšÍ ¦preset£!==U§LiteralÍ¥Í«¤FLAT¦'FLAT'P³ExpressionStatementÍ¶ÍÏV®CallExpressionÍ¶ÍÎR°MemberExpressionÍ¶ÍÌS®ThisExpressionÍ¶ÍºLªIdentifierÍ»ÍÌ±resetFilterStatesÂÂÂP³ExpressionStatementÍÙÍV®CallExpressionÍÙÍR°MemberExpressionÍÙÍäLªIdentifierÍÙÍß¦LoggerLªIdentifierÍàÍä¤infoÂÂ‘`¯TemplateLiteralÍåÍ‘LªIdentifierÍûÍ¦preset’a¯TemplateElementÍæÍùb³EQ preset applied: ³EQ preset applied: Âa¯TemplateElementÍÍb  ÃÂN°MethodDefinitionÍ5ÍuÃÂLªIdentifierÍ<ÍJ®getPresetGains¦methodO²FunctionExpressionÍJÍuÀÂÂÂ‘LªIdentifierÍKÍQ¦presetM®BlockStatementÍSÍu‘Ôrc•¤type¥start£end¬discriminant¥cases¯SwitchStatementÍ^ÍnLªIdentifierÍfÍl¦preset™Ôrd•¤type¥start£endªconsequent¤testªSwitchCaseÍ}ÍÁ‘^¯ReturnStatementÍ›ÍÁT¯ArrayExpressionÍ¢ÍÀšU§LiteralÍ£Í¤ ¡0U§LiteralÍ¦Í§ ¡0U§LiteralÍ©Íª ¡0U§LiteralÍ¬Í­ ¡0U§LiteralÍ¯Í° ¡0U§LiteralÍ²Í³ ¡0U§LiteralÍµÍ¶ ¡0U§LiteralÍ¸Í¹ ¡0U§LiteralÍ»Í¼ ¡0U§LiteralÍ¾Í¿ ¡0U§LiteralÍ‚Íˆ¤FLAT¦'FLAT'dªSwitchCaseÍÏÍ<‘^¯ReturnStatementÍÍ<T¯ArrayExpressionÍÍ;š[¯UnaryExpressionÍÍ¡-ÃU§LiteralÍÍ¡1U§LiteralÍÍ  ¡0U§LiteralÍ"Í#¡2U§LiteralÍ%Í&¡4U§LiteralÍ(Í)¡5U§LiteralÍ+Í,¡4U§LiteralÍ.Í/¡2U§LiteralÍ1Í2 ¡0[¯UnaryExpressionÍ4Í6¡-ÃU§LiteralÍ5Í6¡1[¯UnaryExpressionÍ8Í:¡-ÃU§LiteralÍ9Í:¡2U§LiteralÍÔÍÙ£POP¥'POP'dªSwitchCaseÍJÍ»‘^¯ReturnStatementÍ“Í»T¯ArrayExpressionÍšÍºšU§LiteralÍ›Íœ¡5U§LiteralÍÍŸ¡4U§LiteralÍ¡Í¢¡2U§LiteralÍ¤Í¥ ¡0[¯UnaryExpressionÍ§Í©¡-ÃU§LiteralÍ¨Í©¡2[¯UnaryExpressionÍ«Í­¡-ÃU§LiteralÍ¬Í­¡2U§LiteralÍ¯Í° ¡0U§LiteralÍ²Í³¡2U§LiteralÍµÍ¶¡4U§LiteralÍ¸Í¹¡5U§LiteralÍOÍU¤ROCK¦'ROCK'dªSwitchCaseÍÉÍ0‘^¯ReturnStatementÍ
+Í0T¯ArrayExpressionÍÍ/šU§LiteralÍÍ¡3U§LiteralÍÍ¡2U§LiteralÍÍ ¡0U§LiteralÍÍ¡2U§LiteralÍÍ¡3U§LiteralÍ!Í"¡2U§LiteralÍ$Í% ¡0U§LiteralÍ'Í(¡1U§LiteralÍ*Í+¡3U§LiteralÍ-Í.¡4U§LiteralÍÎÍÔ¤JAZZ¦'JAZZ'dªSwitchCaseÍ>Í±‘^¯ReturnStatementÍ‰Í±T¯ArrayExpressionÍÍ°šU§LiteralÍ‘Í’¡4U§LiteralÍ”Í•¡3U§LiteralÍ—Í˜¡1U§LiteralÍšÍ› ¡0[¯UnaryExpressionÍÍŸ¡-ÃU§LiteralÍÍŸ¡1[¯UnaryExpressionÍ¡Í£¡-ÃU§LiteralÍ¢Í£¡1U§LiteralÍ¥Í¦ ¡0U§LiteralÍ¨Í©¡1U§LiteralÍ«Í¬¡3U§LiteralÍ®Í¯¡4U§LiteralÍCÍN©CLASSICAL«'CLASSICAL'dªSwitchCaseÍ¿Í1‘^¯ReturnStatementÍÍ1T¯ArrayExpressionÍÍ0š[¯UnaryExpressionÍÍ¡-ÃU§LiteralÍÍ¡3[¯UnaryExpressionÍÍ¡-ÃU§LiteralÍÍ¡2U§LiteralÍÍ ¡0U§LiteralÍÍ¡2U§LiteralÍÍ¡5U§LiteralÍ!Í"¡6U§LiteralÍ$Í%¡5U§LiteralÍ'Í(¡2U§LiteralÍ*Í+ ¡0[¯UnaryExpressionÍ-Í/¡-ÃU§LiteralÍ.Í/¡2U§LiteralÍÄÍË¥VOCAL§'VOCAL'dªSwitchCaseÍ?Í¢‘^¯ReturnStatementÍ|Í¢T¯ArrayExpressionÍƒÍ¡šU§LiteralÍ„Í…¡8U§LiteralÍ‡Íˆ¡6U§LiteralÍŠÍ‹¡4U§LiteralÍÍ¡2U§LiteralÍÍ‘ ¡0U§LiteralÍ“Í” ¡0U§LiteralÍ–Í— ¡0U§LiteralÍ™Íš ¡0U§LiteralÍœÍ ¡0U§LiteralÍŸÍ  ¡0U§LiteralÍDÍPªBASS_BOOST¬'BASS_BOOST'dªSwitchCaseÍ°Í‘^¯ReturnStatementÍïÍT¯ArrayExpressionÍöÍšU§LiteralÍ÷Íø ¡0U§LiteralÍúÍû ¡0U§LiteralÍıÍş ¡0U§LiteralÍ Í ¡0U§LiteralÍÍ ¡0U§LiteralÍÍ ¡0U§LiteralÍ	Í
+¡2U§LiteralÍÍ¡4U§LiteralÍÍ¡6U§LiteralÍÍ¡8U§LiteralÍµÍÃ¬TREBLE_BOOST®'TREBLE_BOOST'dªSwitchCaseÍ#Íc‘^¯ReturnStatementÍ=ÍcT¯ArrayExpressionÍDÍbšU§LiteralÍEÍF ¡0U§LiteralÍHÍI ¡0U§LiteralÍKÍL ¡0U§LiteralÍNÍO ¡0U§LiteralÍQÍR ¡0U§LiteralÍTÍU ¡0U§LiteralÍWÍX ¡0U§LiteralÍZÍ[ ¡0U§LiteralÍ]Í^ ¡0U§LiteralÍ`Ía ¡0ÀN°MethodDefinitionÍÍ#ÃÂLªIdentifierÍ¥Í³®getPresetNames¦methodO²FunctionExpressionÍ³Í#ÀÂÂÂM®BlockStatementÍ¶Í#‘^¯ReturnStatementÍÁÍT¯ArrayExpressionÍÈÍ˜U§LiteralÍÉÍÏ¤FLAT¦'FLAT'U§LiteralÍÑÍÖ£POP¥'POP'U§LiteralÍØÍŞ¤ROCK¦'ROCK'U§LiteralÍàÍæ¤JAZZ¦'JAZZ'U§LiteralÍèÍó©CLASSICAL«'CLASSICAL'U§LiteralÍõÍü¥VOCAL§'VOCAL'U§LiteralÍşÍ
+ªBASS_BOOST¬'BASS_BOOST'U§LiteralÍÍ¬TREBLE_BOOST®'TREBLE_BOOST'N°MethodDefinitionÍLÍÃÂLªIdentifierÍSÍg´getPresetDisplayName¦methodO²FunctionExpressionÍgÍÀÂÂÂ‘LªIdentifierÍhÍn¦presetM®BlockStatementÍpÍ‘c¯SwitchStatementÍ{Í	LªIdentifierÍƒÍ‰¦preset™dªSwitchCaseÍšÍ³‘^¯ReturnStatementÍ§Í³U§LiteralÍ®Í²¦é»˜è®¤¨'é»˜è®¤'U§LiteralÍŸÍ¥¤FLAT¦'FLAT'dªSwitchCaseÍÁÍÙ‘^¯ReturnStatementÍÍÍÙU§LiteralÍÔÍØ¦æµè¡Œ¨'æµè¡Œ'U§LiteralÍÆÍË£POP¥'POP'dªSwitchCaseÍçÍ ‘^¯ReturnStatementÍôÍ U§LiteralÍûÍÿ¦æ‘‡æ»š¨'æ‘‡æ»š'U§LiteralÍìÍò¤ROCK¦'ROCK'dªSwitchCaseÍÍ'‘^¯ReturnStatementÍÍ'U§LiteralÍ"Í&¦çˆµå£«¨'çˆµå£«'U§LiteralÍÍ¤JAZZ¦'JAZZ'dªSwitchCaseÍ5ÍS‘^¯ReturnStatementÍGÍSU§LiteralÍNÍR¦å¤å…¸¨'å¤å…¸'U§LiteralÍ:ÍE©CLASSICAL«'CLASSICAL'dªSwitchCaseÍaÍ{‘^¯ReturnStatementÍoÍ{U§LiteralÍvÍz¦äººå£°¨'äººå£°'U§LiteralÍfÍm¥VOCAL§'VOCAL'dªSwitchCaseÍ‰Íª‘^¯ReturnStatementÍœÍªU§LiteralÍ£Í©¬ä½éŸ³å¢å¼º®'ä½éŸ³å¢å¼º'U§LiteralÍÍšªBASS_BOOST¬'BASS_BOOST'dªSwitchCaseÍ¸ÍÛ‘^¯ReturnStatementÍÍÍÛU§LiteralÍÔÍÚ¬é«˜éŸ³å¢å¼º®'é«˜éŸ³å¢å¼º'U§LiteralÍ½ÍË¬TREBLE_BOOST®'TREBLE_BOOST'dªSwitchCaseÍéÍş‘^¯ReturnStatementÍòÍşU§LiteralÍùÍı¦é»˜è®¤¨'é»˜è®¤'ÀN°MethodDefinitionÍ8ÍXÂÂLªIdentifierÍ8ÍI±resetFilterStates¦methodO²FunctionExpressionÍIÍXÀÂÂÂM®BlockStatementÍLÍX‘W¬ForStatementÍWÍQX³VariableDeclarationÍ\Íe‘Y²VariableDeclaratorÍ`ÍeLªIdentifierÍ`Ía¡bU§LiteralÍdÍe ¡0£letZ°BinaryExpressionÍgÍƒLªIdentifierÍgÍh¡b¡<R°MemberExpressionÍkÍƒR°MemberExpressionÍkÍ|S®ThisExpressionÍkÍoLªIdentifierÍpÍ|¬filterStatesÂÂLªIdentifierÍ}Íƒ¦lengthÂÂ[°UpdateExpressionÍ…Íˆ¢++ÂLªIdentifierÍ…Í†¡bM®BlockStatementÍŠÍQ‘W¬ForStatementÍ™ÍFX³VariableDeclarationÍÍ¨‘Y²VariableDeclaratorÍ¢Í¨LªIdentifierÍ¢Í¤¢chU§LiteralÍ§Í¨ ¡0£letZ°BinaryExpressionÍªÍÊLªIdentifierÍªÍ¬¢ch¡<R°MemberExpressionÍ¯ÍÊR°MemberExpressionÍ¯ÍÃR°MemberExpressionÍ¯ÍÀS®ThisExpressionÍ¯Í³LªIdentifierÍ´ÍÀ¬filterStatesÂÂLªIdentifierÍÁÍÂ¡bÃÂLªIdentifierÍÄÍÊ¦lengthÂÂ[°UpdateExpressionÍÌÍĞ¢++ÂLªIdentifierÍÌÍÎ¢chM®BlockStatementÍÒÍF’P³ExpressionStatementÍåÍQ´AssignmentExpressionÍåÍ¡=R°MemberExpressionÍåÍ R°MemberExpressionÍåÍıR°MemberExpressionÍåÍùR°MemberExpressionÍåÍöS®ThisExpressionÍåÍéLªIdentifierÍêÍö¬filterStatesÂÂLªIdentifierÍ÷Íø¡bÃÂLªIdentifierÍúÍü¢chÃÂU§LiteralÍşÍÿ ¡0ÃÂU§LiteralÍÍ ¡0P³ExpressionStatementÍÍ7Q´AssignmentExpressionÍÍ6¡=R°MemberExpressionÍÍ2R°MemberExpressionÍÍ/R°MemberExpressionÍÍ+R°MemberExpressionÍÍ(S®ThisExpressionÍÍLªIdentifierÍÍ(¬filterStatesÂÂLªIdentifierÍ)Í*¡bÃÂLªIdentifierÍ,Í.¢chÃÂU§LiteralÍ0Í1¡1ÃÂU§LiteralÍ5Í6 ¡0N°MethodDefinitionÍ¹Í0ÂÂLªIdentifierÍ¹ÍÉ°calcBiquadCoeffs¦methodO²FunctionExpressionÍÉÍ0ÀÂÂÂ’LªIdentifierÍÊÍÓ©frequencyLªIdentifierÍÕÍÛ¦gainDbM®BlockStatementÍİÍ0X³VariableDeclarationÍèÍ‘Y²VariableDeclaratorÍîÍLªIdentifierÍîÍï¡AV®CallExpressionÍòÍR°MemberExpressionÍòÍúLªIdentifierÍòÍö¤MathLªIdentifierÍ÷Íú£powÂÂ’U§LiteralÍûÍı
+¢10Z°BinaryExpressionÍÿÍ
+LªIdentifierÍÿÍ¦gainDb¡/U§LiteralÍÍ
+(¢40Â¥constX³VariableDeclarationÍ-Í=‘Y²VariableDeclaratorÍ3Í<LªIdentifierÍ3Í4¡QU§LiteralÍ7Í<Ë?öŸ¾vÈ´9¥1.414¥constX³VariableDeclarationÍaÍ–‘Y²VariableDeclaratorÍgÍ•LªIdentifierÍgÍi¢w0Z°BinaryExpressionÍlÍ•Z°BinaryExpressionÍlÍƒZ°BinaryExpressionÍlÍwU§LiteralÍlÍm¡2¡*R°MemberExpressionÍpÍwLªIdentifierÍpÍt¤MathLªIdentifierÍuÍw¢PIÂÂ¡*LªIdentifierÍzÍƒ©frequency¡/R°MemberExpressionÍ†Í•S®ThisExpressionÍ†ÍŠLªIdentifierÍ‹Í•ªsampleRateÂÂ¥constX³VariableDeclarationÍ Í»‘Y²VariableDeclaratorÍ¦ÍºLªIdentifierÍ¦Í«¥sinW0V®CallExpressionÍ®ÍºR°MemberExpressionÍ®Í¶LªIdentifierÍ®Í²¤MathLªIdentifierÍ³Í¶£sinÂÂ‘LªIdentifierÍ·Í¹¢w0Â¥constX³VariableDeclarationÍÅÍà‘Y²VariableDeclaratorÍËÍßLªIdentifierÍËÍĞ¥cosW0V®CallExpressionÍÓÍßR°MemberExpressionÍÓÍÛLªIdentifierÍÓÍ×¤MathLªIdentifierÍØÍÛ£cosÂÂ‘LªIdentifierÍÜÍŞ¢w0Â¥constX³VariableDeclarationÍêÍ‘Y²VariableDeclaratorÍğÍLªIdentifierÍğÍõ¥alphaZ°BinaryExpressionÍøÍLªIdentifierÍøÍı¥sinW0¡/Z°BinaryExpressionÍÍU§LiteralÍÍ¡2¡*LªIdentifierÍÍ¡Q¥constX³VariableDeclarationÍÍ+‘Y²VariableDeclaratorÍÍ*LªIdentifierÍÍ¢b0Z°BinaryExpressionÍÍ*U§LiteralÍÍ¡1¡+Z°BinaryExpressionÍ!Í*LªIdentifierÍ!Í&¥alpha¡*LªIdentifierÍ)Í*¡A¥constX³VariableDeclarationÍ5ÍK‘Y²VariableDeclaratorÍ;ÍJLªIdentifierÍ;Í=¢b1Z°BinaryExpressionÍ@ÍJ[¯UnaryExpressionÍ@ÍB¡-ÃU§LiteralÍAÍB¡2¡*LªIdentifierÍEÍJ¥cosW0¥constX³VariableDeclarationÍUÍn‘Y²VariableDeclaratorÍ[ÍmLªIdentifierÍ[Í]¢b2Z°BinaryExpressionÍ`ÍmU§LiteralÍ`Ía¡1¡-Z°BinaryExpressionÍdÍmLªIdentifierÍdÍi¥alpha¡*LªIdentifierÍlÍm¡A¥constX³VariableDeclarationÍxÍ‘‘Y²VariableDeclaratorÍ~ÍLªIdentifierÍ~Í€¢a0Z°BinaryExpressionÍƒÍU§LiteralÍƒÍ„¡1¡+Z°BinaryExpressionÍ‡ÍLªIdentifierÍ‡ÍŒ¥alpha¡/LªIdentifierÍÍ¡A¥constX³VariableDeclarationÍ›Í±‘Y²VariableDeclaratorÍ¡Í°LªIdentifierÍ¡Í£¢a1Z°BinaryExpressionÍ¦Í°[¯UnaryExpressionÍ¦Í¨¡-ÃU§LiteralÍ§Í¨¡2¡*LªIdentifierÍ«Í°¥cosW0¥constX³VariableDeclarationÍ»ÍÔ‘Y²VariableDeclaratorÍÁÍÓLªIdentifierÍÁÍÃ¢a2Z°BinaryExpressionÍÆÍÓU§LiteralÍÆÍÇ¡1¡-Z°BinaryExpressionÍÊÍÓLªIdentifierÍÊÍÏ¥alpha¡/LªIdentifierÍÒÍÓ¡A¥const^¯ReturnStatementÍôÍ)T¯ArrayExpressionÍûÍ(•Z°BinaryExpressionÍüÍLªIdentifierÍüÍş¢b0¡/LªIdentifierÍÍ¢a0Z°BinaryExpressionÍÍLªIdentifierÍÍ¢b1¡/LªIdentifierÍ
+Í¢a0Z°BinaryExpressionÍÍLªIdentifierÍÍ¢b2¡/LªIdentifierÍÍ¢a0Z°BinaryExpressionÍÍLªIdentifierÍÍ¢a1¡/LªIdentifierÍÍ¢a0Z°BinaryExpressionÍ Í'LªIdentifierÍ Í"¢a2¡/LªIdentifierÍ%Í'¢a0N°MethodDefinitionÍúÍ"ÂÂLªIdentifierÍúÍ®processPcmData¦methodO²FunctionExpressionÍÍ"ÀÂÂÂ’LªIdentifierÍ	Í¦bufferLªIdentifierÍÍ©bytesReadM®BlockStatementÍÍ"˜_«IfStatementÍ'ÍoZ±LogicalExpressionÍ+ÍL[¯UnaryExpressionÍ+Í:¡!ÃR°MemberExpressionÍ,Í:S®ThisExpressionÍ,Í0LªIdentifierÍ1Í:©isEnabledÂÂ¢||Z°BinaryExpressionÍ>ÍLLªIdentifierÍ>ÍG©bytesRead¢<=U§LiteralÍKÍL ¡0M®BlockStatementÍNÍo‘^¯ReturnStatementÍ]ÍdÀÀX³VariableDeclarationÍ’Í¦‘Y²VariableDeclaratorÍ–Í¥LªIdentifierÍ–Í§hasGainU§LiteralÍ Í¥Â¥false£letW¬ForStatementÍ°ÍgX³VariableDeclarationÍµÍ¾‘Y²VariableDeclaratorÍ¹Í¾LªIdentifierÍ¹Íº¡bU§LiteralÍ½Í¾ ¡0£letZ°BinaryExpressionÍÀÍÕLªIdentifierÍÀÍÁ¡b¡<R°MemberExpressionÍÄÍÕR°MemberExpressionÍÄÍÎS®ThisExpressionÍÄÍÈLªIdentifierÍÉÍÎ¥bandsÂÂLªIdentifierÍÏÍÕ¦lengthÂÂ[°UpdateExpressionÍ×ÍÚ¢++ÂLªIdentifierÍ×ÍØ¡bM®BlockStatementÍÜÍg‘_«IfStatementÍëÍ\Z°BinaryExpressionÍïÍV®CallExpressionÍïÍR°MemberExpressionÍïÍ÷LªIdentifierÍïÍó¤MathLªIdentifierÍôÍ÷£absÂÂ‘R°MemberExpressionÍøÍ
+R°MemberExpressionÍøÍR°MemberExpressionÍøÍS®ThisExpressionÍøÍüLªIdentifierÍıÍ¥bandsÂÂLªIdentifierÍÍ¡bÃÂLªIdentifierÍÍ
+¤gainÂÂÂ¡>U§LiteralÍÍË?¹™™™™™š£0.1M®BlockStatementÍÍ\’P³ExpressionStatementÍ&Í5Q´AssignmentExpressionÍ&Í4¡=LªIdentifierÍ&Í-§hasGainU§LiteralÍ0Í4Ã¤trueÔre”¤type¥start£end¥label®BreakStatementÍGÍMÀÀ_«IfStatementÍqÍ [¯UnaryExpressionÍuÍ}¡!ÃLªIdentifierÍvÍ}§hasGainM®BlockStatementÍÍ ‘^¯ReturnStatementÍÍ•ÀÀX³VariableDeclarationÍªÍÌ‘Y²VariableDeclaratorÍ°ÍËLªIdentifierÍ°Í´¤viewÔrf•¤type¥start£end¦callee©arguments­NewExpressionÍ·ÍËLªIdentifierÍ»ÍÃ¨DataView‘LªIdentifierÍÄÍÊ¦buffer¥constX³VariableDeclarationÍÖÍ‘Y²VariableDeclaratorÍÜÍLªIdentifierÍÜÍè¬samplesCountV®CallExpressionÍëÍR°MemberExpressionÍëÍõLªIdentifierÍëÍï¤MathLªIdentifierÍğÍõ¥floorÂÂ‘Z°BinaryExpressionÍöÍLªIdentifierÍöÍÿ©bytesRead¡/U§LiteralÍÍ¡2Â¥constX³VariableDeclarationÍ-ÍM‘Y²VariableDeclaratorÍ3ÍLLªIdentifierÍ3Í<©frameSizeR°MemberExpressionÍ?ÍLS®ThisExpressionÍ?ÍCLªIdentifierÍDÍL¨channelsÂÂ¥constW¬ForStatementÍ€Í"X³VariableDeclarationÍ…Í‘Y²VariableDeclaratorÍ‰ÍLªIdentifierÍ‰ÍŠ¡bU§LiteralÍÍ ¡0£letZ°BinaryExpressionÍÍ¥LªIdentifierÍÍ‘¡b¡<R°MemberExpressionÍ”Í¥R°MemberExpressionÍ”ÍS®ThisExpressionÍ”Í˜LªIdentifierÍ™Í¥bandsÂÂLªIdentifierÍŸÍ¥¦lengthÂÂ[°UpdateExpressionÍ§Íª¢++ÂLªIdentifierÍ§Í¨¡bM®BlockStatementÍ¬Í"™X³VariableDeclarationÍ»ÍÛ‘Y²VariableDeclaratorÍÁÍÚLªIdentifierÍÁÍÅ¤gainR°MemberExpressionÍÈÍÚR°MemberExpressionÍÈÍÕR°MemberExpressionÍÈÍÒS®ThisExpressionÍÈÍÌLªIdentifierÍÍÍÒ¥bandsÂÂLªIdentifierÍÓÍÔ¡bÃÂLªIdentifierÍÖÍÚ¤gainÂÂ¥const_«IfStatementÍéÍ;Z°BinaryExpressionÍíÍV®CallExpressionÍíÍûR°MemberExpressionÍíÍõLªIdentifierÍíÍñ¤MathLªIdentifierÍòÍõ£absÂÂ‘LªIdentifierÍöÍú¤gainÂ¡<U§LiteralÍşÍË?¹™™™™™š£0.1M®BlockStatementÍÍ;‘e±ContinueStatementÍÍÀÀX³VariableDeclarationÍIÍ‘Y²VariableDeclaratorÍOÍŒLªIdentifierÍOÍU¦coeffsV®CallExpressionÍXÍŒR°MemberExpressionÍXÍmS®ThisExpressionÍXÍ\LªIdentifierÍ]Ím°calcBiquadCoeffsÂÂ’R°MemberExpressionÍnÍ…R°MemberExpressionÍnÍ{R°MemberExpressionÍnÍxS®ThisExpressionÍnÍrLªIdentifierÍsÍx¥bandsÂÂLªIdentifierÍyÍz¡bÃÂLªIdentifierÍ|Í…©frequencyÂÂLªIdentifierÍ‡Í‹¤gainÂ¥constX³VariableDeclarationÍ›Í°‘Y²VariableDeclaratorÍ¡Í¯LªIdentifierÍ¡Í£¢b0R°MemberExpressionÍ¦Í¯LªIdentifierÍ¦Í¬¦coeffsU§LiteralÍ­Í® ¡0ÃÂ¥constX³VariableDeclarationÍ¾ÍÓ‘Y²VariableDeclaratorÍÄÍÒLªIdentifierÍÄÍÆ¢b1R°MemberExpressionÍÉÍÒLªIdentifierÍÉÍÏ¦coeffsU§LiteralÍĞÍÑ¡1ÃÂ¥constX³VariableDeclarationÍáÍö‘Y²VariableDeclaratorÍçÍõLªIdentifierÍçÍé¢b2R°MemberExpressionÍìÍõLªIdentifierÍìÍò¦coeffsU§LiteralÍóÍô¡2ÃÂ¥constX³VariableDeclarationÍÍ‘Y²VariableDeclaratorÍ
+ÍLªIdentifierÍ
+Í¢a1R°MemberExpressionÍÍLªIdentifierÍÍ¦coeffsU§LiteralÍÍ¡3ÃÂ¥constX³VariableDeclarationÍ'Í<‘Y²VariableDeclaratorÍ-Í;LªIdentifierÍ-Í/¢a2R°MemberExpressionÍ2Í;LªIdentifierÍ2Í8¦coeffsU§LiteralÍ9Í:¡4ÃÂ¥constW¬ForStatementÍbÍ!üX³VariableDeclarationÍgÍp‘Y²VariableDeclaratorÍkÍpLªIdentifierÍkÍl¡iU§LiteralÍoÍp ¡0£letZ°BinaryExpressionÍrÍ‚LªIdentifierÍrÍs¡i¡<LªIdentifierÍvÍ‚¬samplesCountQ´AssignmentExpressionÍ„Í’¢+=LªIdentifierÍ„Í…¡iLªIdentifierÍ‰Í’©frameSizeM®BlockStatementÍ”Í!ü‘W¬ForStatementÍ§Í!íX³VariableDeclarationÍ¬Í¶‘Y²VariableDeclaratorÍ°Í¶LªIdentifierÍ°Í²¢chU§LiteralÍµÍ¶ ¡0£letZ°BinaryExpressionÍ¸ÍÆLªIdentifierÍ¸Íº¢ch¡<LªIdentifierÍ½ÍÆ©frameSize[°UpdateExpressionÍÈÍÌ¢++ÂLªIdentifierÍÈÍÊ¢chM®BlockStatementÍÎÍ!íšX³VariableDeclarationÍåÍş‘Y²VariableDeclaratorÍëÍıLªIdentifierÍëÍô©sampleIdxZ°BinaryExpressionÍ÷ÍıLªIdentifierÍ÷Íø¡i¡+LªIdentifierÍûÍı¢ch¥const_«IfStatementÍÍWZ°BinaryExpressionÍÍ6Z°BinaryExpressionÍÍ)Z°BinaryExpressionÍÍ%LªIdentifierÍÍ!©sampleIdx¡*U§LiteralÍ$Í%¡2¡+U§LiteralÍ(Í)¡1¢>=LªIdentifierÍ-Í6©bytesReade®BreakStatementÍQÍWÀÀX³VariableDeclarationÍ”ÍÁ‘Y²VariableDeclaratorÍšÍÀLªIdentifierÍšÍ›¡xV®CallExpressionÍÍÀR°MemberExpressionÍÍ«LªIdentifierÍÍ¢¤viewLªIdentifierÍ£Í«¨getInt16ÂÂ’Z°BinaryExpressionÍ¬Í¹LªIdentifierÍ¬Íµ©sampleIdx¡*U§LiteralÍ¸Í¹¡2U§LiteralÍ»Í¿Ã¤trueÂ¥constX³VariableDeclarationÍ Í +‘Y²VariableDeclaratorÍ 
+Í *LªIdentifierÍ 
+Í ¢s0R°MemberExpressionÍ Í *R°MemberExpressionÍ Í 'R°MemberExpressionÍ Í #R°MemberExpressionÍ Í  S®ThisExpressionÍ Í LªIdentifierÍ Í  ¬filterStatesÂÂLªIdentifierÍ !Í "¡bÃÂLªIdentifierÍ $Í &¢chÃÂU§LiteralÍ (Í ) ¡0ÃÂ¥constX³VariableDeclarationÍ AÍ h‘Y²VariableDeclaratorÍ GÍ gLªIdentifierÍ GÍ I¢s1R°MemberExpressionÍ LÍ gR°MemberExpressionÍ LÍ dR°MemberExpressionÍ LÍ `R°MemberExpressionÍ LÍ ]S®ThisExpressionÍ LÍ PLªIdentifierÍ QÍ ]¬filterStatesÂÂLªIdentifierÍ ^Í _¡bÃÂLªIdentifierÍ aÍ c¢chÃÂU§LiteralÍ eÍ f¡1ÃÂ¥constX³VariableDeclarationÍ ~Í ”‘Y²VariableDeclaratorÍ „Í “LªIdentifierÍ „Í …¡yZ°BinaryExpressionÍ ˆÍ “Z°BinaryExpressionÍ ˆÍ LªIdentifierÍ ˆÍ Š¢b0¡*LªIdentifierÍ Í ¡x¡+LªIdentifierÍ ‘Í “¢s0¥constP³ExpressionStatementÍ ªÍ İQ´AssignmentExpressionÍ ªÍ Ü¡=R°MemberExpressionÍ ªÍ ÅR°MemberExpressionÍ ªÍ ÂR°MemberExpressionÍ ªÍ ¾R°MemberExpressionÍ ªÍ »S®ThisExpressionÍ ªÍ ®LªIdentifierÍ ¯Í »¬filterStatesÂÂLªIdentifierÍ ¼Í ½¡bÃÂLªIdentifierÍ ¿Í Á¢chÃÂU§LiteralÍ ÃÍ Ä ¡0ÃÂZ°BinaryExpressionÍ ÈÍ ÜZ°BinaryExpressionÍ ÈÍ ×Z°BinaryExpressionÍ ÈÍ ÎLªIdentifierÍ ÈÍ Ê¢b1¡*LªIdentifierÍ ÍÍ Î¡x¡-Z°BinaryExpressionÍ ÑÍ ×LªIdentifierÍ ÑÍ Ó¢a1¡*LªIdentifierÍ ÖÍ ×¡y¡+LªIdentifierÍ ÚÍ Ü¢s1P³ExpressionStatementÍ óÍ!!Q´AssignmentExpressionÍ óÍ! ¡=R°MemberExpressionÍ óÍ!R°MemberExpressionÍ óÍ!R°MemberExpressionÍ óÍ!R°MemberExpressionÍ óÍ!S®ThisExpressionÍ óÍ ÷LªIdentifierÍ øÍ!¬filterStatesÂÂLªIdentifierÍ!Í!¡bÃÂLªIdentifierÍ!Í!
+¢chÃÂU§LiteralÍ!Í!¡1ÃÂZ°BinaryExpressionÍ!Í! Z°BinaryExpressionÍ!Í!LªIdentifierÍ!Í!¢b2¡*LªIdentifierÍ!Í!¡x¡-Z°BinaryExpressionÍ!Í! LªIdentifierÍ!Í!¢a2¡*LªIdentifierÍ!Í! ¡yX³VariableDeclarationÍ!WÍ!˜‘Y²VariableDeclaratorÍ!]Í!—LªIdentifierÍ!]Í!d§clampedV®CallExpressionÍ!gÍ!—R°MemberExpressionÍ!gÍ!oLªIdentifierÍ!gÍ!k¤MathLªIdentifierÍ!lÍ!o£maxÂÂ’[¯UnaryExpressionÍ!pÍ!v¡-ÃU§LiteralÍ!qÍ!vÍ€ ¥32768V®CallExpressionÍ!xÍ!–R°MemberExpressionÍ!xÍ!€LªIdentifierÍ!xÍ!|¤MathLªIdentifierÍ!}Í!€£minÂÂ’U§LiteralÍ!Í!†Íÿ¥32767V®CallExpressionÍ!ˆÍ!•R°MemberExpressionÍ!ˆÍ!’LªIdentifierÍ!ˆÍ!Œ¤MathLªIdentifierÍ!Í!’¥roundÂÂ‘LªIdentifierÍ!“Í!”¡yÂÂÂ¥constP³ExpressionStatementÍ!®Í!ÚV®CallExpressionÍ!®Í!ÙR°MemberExpressionÍ!®Í!»LªIdentifierÍ!®Í!²¤viewLªIdentifierÍ!³Í!»¨setInt16ÂÂ“Z°BinaryExpressionÍ!¼Í!ÉLªIdentifierÍ!¼Í!Å©sampleIdx¡*U§LiteralÍ!ÈÍ!É¡2LªIdentifierÍ!ËÍ!Ò§clampedU§LiteralÍ!ÔÍ!ØÃ¤trueÂN°MethodDefinitionÍ"6Í"­ÂÂLªIdentifierÍ"6Í";¥reset¦methodO²FunctionExpressionÍ";Í"­ÀÂÂÂM®BlockStatementÍ">Í"­“P³ExpressionStatementÍ"IÍ"bV®CallExpressionÍ"IÍ"aR°MemberExpressionÍ"IÍ"YS®ThisExpressionÍ"IÍ"MLªIdentifierÍ"NÍ"Y«applyPresetÂÂ‘U§LiteralÍ"ZÍ"`¤FLAT¦'FLAT'ÂP³ExpressionStatementÍ"lÍ"ƒQ´AssignmentExpressionÍ"lÍ"‚¡=R°MemberExpressionÍ"lÍ"zS®ThisExpressionÍ"lÍ"pLªIdentifierÍ"qÍ"z©isEnabledÂÂU§LiteralÍ"}Í"‚Â¥falseP³ExpressionStatementÍ"Í"¦V®CallExpressionÍ"Í"¥R°MemberExpressionÍ"Í"£S®ThisExpressionÍ"Í"‘LªIdentifierÍ"’Í"£±resetFilterStatesÂÂÂÀ‘Ôrg•¤type¥start£endªspecifiers¦source±ImportDeclarationÍnÍ‘Ôrh•¤type¥start£end¨imported¥local¯ImportSpecifierÍwÍ}LªIdentifierÍwÍ}¦LoggerLªIdentifierÍwÍ}¦LoggerU§LiteralÍ…Í¨./Loggerª'./Logger'

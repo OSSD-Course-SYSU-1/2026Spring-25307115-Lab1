@@ -1,0 +1,732 @@
+Ôr@Ÿªassertions¤code´customTransformCache¬dependencies¢id¤meta±moduleSideEffects¬originalCode±originalSourcemap«resolvedIds®sourcemapChainµsyntheticNamedExportsµtransformDependencies®transformFiles¨cacheAstÔrAÚC¡if (!("finalizeConstruction" in ViewPU.prototype)) {
+    Reflect.set(ViewPU.prototype, "finalizeConstruction", () => { });
+}
+import effectKit from "@ohos.effectKit";
+import image from "@ohos.multimedia.image";
+import { Logger } from '../utils/Logger';
+import { ControlAreaComponent } from '../components/ControlAreaComponent';
+import { PlayListComponent } from '../components/PlayListComponent';
+import { songDataList, AudioName, AudioType } from '../common/Constants';
+import { ColorTools } from '../utils/ColorTools';
+import { PlayerController } from '../player/PlayerController';
+class Index extends ViewPU {
+    constructor(parent, params, __localStorage, elmtId = -1, paramsLambda = undefined, extraInfo) {
+        super(parent, __localStorage, elmtId, extraInfo);
+        if (typeof paramsLambda === "function") {
+            this.paramsGenerator_ = paramsLambda;
+        }
+        this.songDataList = songDataList;
+        this.__imageColor = new ObservedPropertySimplePU('rgba(0, 0, 2, 1.00)', this, "imageColor");
+        this.__imageLabel = new ObservedPropertyObjectPU(this.songDataList[0].label, this, "imageLabel");
+        this.__currentSongIndex = new ObservedPropertySimplePU(0, this, "currentSongIndex");
+        this.__isShowPlayList = new ObservedPropertySimplePU(false, this, "isShowPlayList");
+        this.__isShowPlayListProvider = new ObservedPropertySimplePU(false, this, "isShowPlayListProvider");
+        this.addProvidedVar("isShowPlayListProvider", this.__isShowPlayListProvider, false);
+        this.playerController = new PlayerController();
+        this.setInitiallyProvidedValue(params);
+        this.finalizeConstruction();
+    }
+    setInitiallyProvidedValue(params) {
+        if (params.songDataList !== undefined) {
+            this.songDataList = params.songDataList;
+        }
+        if (params.imageColor !== undefined) {
+            this.imageColor = params.imageColor;
+        }
+        if (params.imageLabel !== undefined) {
+            this.imageLabel = params.imageLabel;
+        }
+        if (params.currentSongIndex !== undefined) {
+            this.currentSongIndex = params.currentSongIndex;
+        }
+        if (params.isShowPlayList !== undefined) {
+            this.isShowPlayList = params.isShowPlayList;
+        }
+        if (params.isShowPlayListProvider !== undefined) {
+            this.isShowPlayListProvider = params.isShowPlayListProvider;
+        }
+        if (params.playerController !== undefined) {
+            this.playerController = params.playerController;
+        }
+    }
+    updateStateVars(params) {
+    }
+    purgeVariableDependenciesOnElmtId(rmElmtId) {
+        this.__imageColor.purgeDependencyOnElmtId(rmElmtId);
+        this.__imageLabel.purgeDependencyOnElmtId(rmElmtId);
+        this.__currentSongIndex.purgeDependencyOnElmtId(rmElmtId);
+        this.__isShowPlayList.purgeDependencyOnElmtId(rmElmtId);
+        this.__isShowPlayListProvider.purgeDependencyOnElmtId(rmElmtId);
+    }
+    aboutToBeDeleted() {
+        this.__imageColor.aboutToBeDeleted();
+        this.__imageLabel.aboutToBeDeleted();
+        this.__currentSongIndex.aboutToBeDeleted();
+        this.__isShowPlayList.aboutToBeDeleted();
+        this.__isShowPlayListProvider.aboutToBeDeleted();
+        SubscriberManager.Get().delete(this.id__());
+        this.aboutToBeDeletedInternal();
+    }
+    get imageColor() {
+        return this.__imageColor.get();
+    }
+    set imageColor(newValue) {
+        this.__imageColor.set(newValue);
+    }
+    get imageLabel() {
+        return this.__imageLabel.get();
+    }
+    set imageLabel(newValue) {
+        this.__imageLabel.set(newValue);
+    }
+    get currentSongIndex() {
+        return this.__currentSongIndex.get();
+    }
+    set currentSongIndex(newValue) {
+        this.__currentSongIndex.set(newValue);
+    }
+    get isShowPlayList() {
+        return this.__isShowPlayList.get();
+    }
+    set isShowPlayList(newValue) {
+        this.__isShowPlayList.set(newValue);
+    }
+    get isShowPlayListProvider() {
+        return this.__isShowPlayListProvider.get();
+    }
+    set isShowPlayListProvider(newValue) {
+        this.__isShowPlayListProvider.set(newValue);
+    }
+    aboutToAppear() {
+        this.getImageColor();
+        this.restoreContinuationState();
+    }
+    initialRender() {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Stack.create();
+            Stack.height('100%');
+            Stack.width('100%');
+            Stack.backgroundColor(this.imageColor);
+        }, Stack);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Image.create(this.imageLabel);
+            Image.size({ height: '120%' });
+            Image.aspectRatio(1);
+            Image.objectFit(ImageFit.Cover);
+            Image.opacity(0.5);
+        }, Image);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.height('100%');
+            Column.width('100%');
+            Column.padding({
+                top: 64,
+                left: 24,
+                right: 24,
+                bottom: 24
+            });
+            globalThis.Gesture.create(GesturePriority.Low);
+            GestureGroup.create(GestureMode.Parallel);
+            // å·¦æ»‘ä¸‹ä¸€æ›²
+            PanGesture.create({ direction: PanDirection.Left, distance: 80 });
+            // å·¦æ»‘ä¸‹ä¸€æ›²
+            PanGesture.onActionEnd(() => {
+                this.playNext();
+            });
+            // å·¦æ»‘ä¸‹ä¸€æ›²
+            PanGesture.pop();
+            // å³æ»‘ä¸Šä¸€æ›²
+            PanGesture.create({ direction: PanDirection.Right, distance: 80 });
+            // å³æ»‘ä¸Šä¸€æ›²
+            PanGesture.onActionEnd(() => {
+                this.playPrevious();
+            });
+            // å³æ»‘ä¸Šä¸€æ›²
+            PanGesture.pop();
+            GestureGroup.pop();
+            globalThis.Gesture.pop();
+        }, Column);
+        this.CoverInfo.bind(this)();
+        this.MusicInfo.bind(this)();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Blank.create();
+        }, Blank);
+        Blank.pop();
+        {
+            this.observeComponentCreation2((elmtId, isInitialRender) => {
+                if (isInitialRender) {
+                    let componentCall = new ControlAreaComponent(this, {
+                        songData: this.songDataList[this.currentSongIndex],
+                        imageColor: this.imageColor
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Index.ets", line: 55, col: 9 });
+                    ViewPU.create(componentCall);
+                    let paramsLambda = () => {
+                        return {
+                            songData: this.songDataList[this.currentSongIndex],
+                            imageColor: this.imageColor
+                        };
+                    };
+                    componentCall.paramsGenerator_ = paramsLambda;
+                }
+                else {
+                    this.updateStateVarsOfChildByElmtId(elmtId, {
+                        songData: this.songDataList[this.currentSongIndex],
+                        imageColor: this.imageColor
+                    });
+                }
+            }, { name: "ControlAreaComponent" });
+        }
+        Column.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            If.create();
+            // æ’­æ”¾åˆ—è¡¨å¼¹çª—
+            if (this.isShowPlayList) {
+                this.ifElseBranchUpdateFunction(0, () => {
+                    this.observeComponentCreation2((elmtId, isInitialRender) => {
+                        __Common__.create();
+                        globalThis.Context.animation({
+                            duration: 300
+                        });
+                        __Common__.position({ x: 0, y: '100%' });
+                        __Common__.translate({ y: this.isShowPlayList ? '-100%' : '0%' });
+                        globalThis.Context.animation(null);
+                    }, __Common__);
+                    {
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            if (isInitialRender) {
+                                let componentCall = new PlayListComponent(this, {
+                                    songList: this.songDataList,
+                                    currentIndex: this.currentSongIndex,
+                                    playMode: this.playerController.getPlayMode(),
+                                    imageColor: this.imageColor,
+                                    onSongSelect: (index) => {
+                                        this.switchSong(index);
+                                    }
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Index.ets", line: 85, col: 9 });
+                                ViewPU.create(componentCall);
+                                let paramsLambda = () => {
+                                    return {
+                                        songList: this.songDataList,
+                                        currentIndex: this.currentSongIndex,
+                                        playMode: this.playerController.getPlayMode(),
+                                        imageColor: this.imageColor,
+                                        onSongSelect: (index) => {
+                                            this.switchSong(index);
+                                        }
+                                    };
+                                };
+                                componentCall.paramsGenerator_ = paramsLambda;
+                            }
+                            else {
+                                this.updateStateVarsOfChildByElmtId(elmtId, {
+                                    songList: this.songDataList,
+                                    currentIndex: this.currentSongIndex,
+                                    playMode: this.playerController.getPlayMode(),
+                                    imageColor: this.imageColor
+                                });
+                            }
+                        }, { name: "PlayListComponent" });
+                    }
+                    __Common__.pop();
+                });
+            }
+            else {
+                this.ifElseBranchUpdateFunction(1, () => {
+                });
+            }
+        }, If);
+        If.pop();
+        Stack.pop();
+    }
+    CoverInfo(parent = null) {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create();
+            Row.height('40%');
+        }, Row);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Image.create(this.songDataList[this.currentSongIndex].label);
+            Image.height('100%');
+            Image.aspectRatio(1);
+            Image.borderRadius(8);
+            Image.shadow({
+                radius: 12,
+                color: '#66000000',
+                offsetX: 0,
+                offsetY: 8
+            });
+            Image.margin(3);
+        }, Image);
+        Row.pop();
+    }
+    // åˆ‡æ¢æ­Œæ›²
+    switchSong(index) {
+        this.currentSongIndex = index;
+        this.getImageColor();
+        // é€šçŸ¥æ’­æ”¾å™¨åˆ‡æ¢æ­Œæ›²
+        const song = this.songDataList[index];
+        this.getUIContext().getHostContext()?.resourceManager.getRawFd(song.src + AudioName.MP3)
+            .then((rawFileDescriptor) => {
+            this.playerController.switchSong(index, rawFileDescriptor, AudioType.MP3);
+        })
+            .catch((error) => {
+            Logger.error(`Switch song error: ${error.code}, message: ${error.message}`);
+        });
+    }
+    // ä¸Šä¸€æ›²
+    playPrevious() {
+        try {
+            const currentIndex = this.playerController.getCurrentIndex();
+            const newIndex = this.playerController.previousSong(this.getUIContext().getHostContext().resourceManager.getRawFdSync(this.songDataList[currentIndex].src + AudioName.MP3), AudioType.MP3);
+            this.switchSong(newIndex);
+        }
+        catch (error) {
+            Logger.error(`playPrevious error: ${error}`);
+        }
+    }
+    // ä¸‹ä¸€æ›²
+    playNext() {
+        try {
+            const currentIndex = this.playerController.getCurrentIndex();
+            const newIndex = this.playerController.nextSong(this.getUIContext().getHostContext().resourceManager.getRawFdSync(this.songDataList[currentIndex].src + AudioName.MP3), AudioType.MP3);
+            this.switchSong(newIndex);
+        }
+        catch (error) {
+            Logger.error(`playNext error: ${error}`);
+        }
+    }
+    MusicInfo(parent = null) {
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.margin({ top: 24 });
+        }, Column);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Flex.create({ justifyContent: FlexAlign.SpaceBetween, alignItems: ItemAlign.Center });
+        }, Flex);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Text.create(this.songDataList[this.currentSongIndex].title);
+            Text.fontSize(20);
+            Text.fontColor(Color.White);
+            Text.opacity(0.86);
+            Text.fontWeight(FontWeight.Bold);
+            Text.fontFamily('HarmonyHeiTi-Bold');
+        }, Text);
+        Text.pop();
+        Flex.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Text.create(this.songDataList[this.currentSongIndex].singer);
+            Text.textAlign(TextAlign.Start);
+            Text.fontSize(14);
+            Text.fontColor('#99FFFFFF');
+            Text.fontFamily('HarmonyHeiTi');
+            Text.width('100%');
+            Text.fontWeight(FontWeight.Regular);
+        }, Text);
+        Text.pop();
+        Column.pop();
+    }
+    getImageColor() {
+        this.getUIContext().getHostContext().resourceManager.getMediaContent(this.songDataList[0].label.id)
+            .then((value) => {
+            let buffer = value.buffer;
+            let imageSource = image.createImageSource(buffer);
+            let currentPixelMap = undefined;
+            imageSource.createPixelMap().then((pixelMap) => {
+                effectKit.createColorPicker(pixelMap, (error, colorPicker) => {
+                    if (error) {
+                        Logger.error(`Failed to create color picker. Error: ${error.code}, message: ${error.message}`);
+                    }
+                    else {
+                        currentPixelMap = pixelMap;
+                        let color = colorPicker.getLargestProportionColor();
+                        let colorArr = ColorTools.dealColor(color.red, color.green, color.blue);
+                        this.imageColor = `rgba(${colorArr[0]}, ${colorArr[1]}, ${colorArr[2]}, 1)`;
+                    }
+                });
+                let headFilter = effectKit.createEffect(pixelMap);
+                if (headFilter !== null) {
+                    headFilter.blur(15);
+                    headFilter.getEffectPixelMap().then((value) => {
+                        this.imageLabel = value;
+                    });
+                }
+            })
+                .finally(() => {
+                imageSource?.release();
+                currentPixelMap?.release();
+            })
+                .catch((error) => {
+                Logger.error(`createPixelMap error: ${error.code}, message: ${error.message}`);
+            });
+        })
+            .catch((error) => {
+            Logger.error(`getMediaContent error: ${error.code}, message: ${error.message}`);
+        });
+    }
+    /**
+     * æ¢å¤æµè½¬çŠ¶æ€
+     */
+    async restoreContinuationState() {
+        try {
+            const context = this.getUIContext().getHostContext();
+            if (!context)
+                return;
+            // æ¢å¤æ’­æ”¾å™¨çŠ¶æ€
+            const restoredTime = await this.playerController.restorePlayerState(context);
+            // å¦‚æžœæœ‰ä¿å­˜çš„æ’­æ”¾è¿›åº¦ï¼Œè·³è½¬åˆ°è¯¥ä½ç½®
+            if (restoredTime > 0) {
+                Logger.info(`æµè½¬åˆ°è®¾å¤‡ï¼Œæ¢å¤åˆ° ${restoredTime}ms`);
+                // å»¶è¿Ÿä¸€ä¸‹å†è·³è½¬ï¼Œç­‰å¾…æ’­æ”¾å™¨åˆå§‹åŒ–å®Œæˆ
+                setTimeout(() => {
+                    this.playerController.seek(restoredTime);
+                }, 500);
+            }
+        }
+        catch (error) {
+            Logger.error(`æ¢å¤æµè½¬çŠ¶æ€å¤±è´¥: ${error}`);
+        }
+    }
+    rerender() {
+        this.updateDirtyElements();
+    }
+    static getEntryName() {
+        return "Index";
+    }
+}
+registerNamedRoute(() => new Index(undefined, {}), "", { bundleName: "com.sample.AudioFormatSwitch", moduleName: "entry", pagePath: "pages/Index", pageFullPath: "entry/src/main/ets/pages/Index", integratedHsp: "false", moduleType: "followWithHap" });
+//# sourceMappingURL=Index.js.mapÂ˜ÙT hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.effectKit.d.tsÙ[ hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.multimedia.image.d.tsÙAC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\utils\Logger.etsÙTC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\components\ControlAreaComponent.etsÙQC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\components\PlayListComponent.etsÙEC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\common\Constants.etsÙEC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\utils\ColorTools.etsÙLC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\player\PlayerController.etsÙ@C:\Users\Solitary\Desktop\3\3\entry\src\main\ets\pages\Index.etsÔrBšªmoduleName±isLocalDependency¯isNodeEntryFile§pkgPath±belongProjectPath§pkgNameªpkgVersion±dependencyPkgInfo°belongModulePath¬shouldEmitJs¥entryÃÂÙ#C:\Users\Solitary\Desktop\3\3\entry½C:\Users\Solitary\Desktop\3\3¥entry¥1.0.0Ô  Ù#C:\Users\Solitary\Desktop\3\3\entryÃÃÚ ?/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { BusinessError } from '@kit.BasicServicesKit';
+import { effectKit } from '@kit.ArkGraphics2D';
+import { image } from '@kit.ImageKit';
+import { Logger } from '../utils/Logger';
+import { SongData } from '../model/SongData';
+import { ControlAreaComponent } from '../components/ControlAreaComponent';
+import { PlayListComponent } from '../components/PlayListComponent';
+import { songDataList, AudioName, AudioType, PlayMode } from '../common/Constants';
+import { ColorTools } from '../utils/ColorTools';
+import { PlayerController } from '../player/PlayerController';
+
+@Entry
+@Component
+struct Index {
+  private songDataList: SongData[] = songDataList;
+  @State imageColor: string = 'rgba(0, 0, 2, 1.00)';
+  @State imageLabel: PixelMap | Resource = this.songDataList[0].label;
+  @State currentSongIndex: number = 0;
+  @State isShowPlayList: boolean = false;
+  @Provide isShowPlayListProvider: boolean = false;
+  private playerController: PlayerController = new PlayerController();
+
+  aboutToAppear(): void {
+    this.getImageColor();
+    this.restoreContinuationState();
+  }
+
+  build() {
+    Stack() {
+      Image(this.imageLabel)
+        .size({ height: '120%' })
+        .aspectRatio(1)
+        .objectFit(ImageFit.Cover)
+        .opacity(0.5)
+
+      Column() {
+        this.CoverInfo()
+        this.MusicInfo()
+        Blank()
+        ControlAreaComponent({ 
+          songData: this.songDataList[this.currentSongIndex], 
+          imageColor: this.imageColor 
+        })
+      }
+      .height('100%')
+      .width('100%')
+      .padding({
+        top: 64,
+        left: 24,
+        right: 24,
+        bottom: 24
+      })
+      .gesture(
+        GestureGroup(GestureMode.Parallel,
+          // å·¦æ»‘ä¸‹ä¸€æ›²
+          PanGesture({ direction: PanDirection.Left, distance: 80 })
+            .onActionEnd(() => {
+              this.playNext();
+            }),
+          // å³æ»‘ä¸Šä¸€æ›²
+          PanGesture({ direction: PanDirection.Right, distance: 80 })
+            .onActionEnd(() => {
+              this.playPrevious();
+            })
+        )
+      )
+
+      // æ’­æ”¾åˆ—è¡¨å¼¹çª—
+      if (this.isShowPlayList) {
+        PlayListComponent({
+          songList: this.songDataList,
+          currentIndex: this.currentSongIndex,
+          playMode: this.playerController.getPlayMode(),
+          imageColor: this.imageColor,
+          onSongSelect: (index: number) => {
+            this.switchSong(index);
+          }
+        })
+          .position({ x: 0, y: '100%' })
+          .translate({ y: this.isShowPlayList ? '-100%' : '0%' })
+          .animation({
+            duration: 300
+          })
+      }
+    }
+    .height('100%')
+    .width('100%')
+    .backgroundColor(this.imageColor)
+  }
+
+  @Builder
+  CoverInfo() {
+    Row() {
+      Image(this.songDataList[this.currentSongIndex].label)
+        .height('100%')
+        .aspectRatio(1)
+        .borderRadius(8)
+        .shadow({
+          radius: 12,
+          color: '#66000000',
+          offsetX: 0,
+          offsetY: 8
+        })
+        .margin(3)
+    }
+    .height('40%')
+  }
+
+  // åˆ‡æ¢æ­Œæ›²
+  private switchSong(index: number): void {
+    this.currentSongIndex = index;
+    this.getImageColor();
+    
+    // é€šçŸ¥æ’­æ”¾å™¨åˆ‡æ¢æ­Œæ›²
+    const song = this.songDataList[index];
+    this.getUIContext().getHostContext()?.resourceManager.getRawFd(song.src + AudioName.MP3)
+      .then((rawFileDescriptor) => {
+        this.playerController.switchSong(index, rawFileDescriptor, AudioType.MP3);
+      })
+      .catch((error: BusinessError) => {
+        Logger.error(`Switch song error: ${error.code}, message: ${error.message}`);
+      });
+  }
+
+  // ä¸Šä¸€æ›²
+  private playPrevious(): void {
+    try {
+      const currentIndex = this.playerController.getCurrentIndex();
+      const newIndex = this.playerController.previousSong(
+        this.getUIContext().getHostContext()!.resourceManager.getRawFdSync(
+          this.songDataList[currentIndex].src + AudioName.MP3
+        ),
+        AudioType.MP3
+      );
+      this.switchSong(newIndex);
+    } catch (error) {
+      Logger.error(`playPrevious error: ${error}`);
+    }
+  }
+
+  // ä¸‹ä¸€æ›²
+  private playNext(): void {
+    try {
+      const currentIndex = this.playerController.getCurrentIndex();
+      const newIndex = this.playerController.nextSong(
+        this.getUIContext().getHostContext()!.resourceManager.getRawFdSync(
+          this.songDataList[currentIndex].src + AudioName.MP3
+        ),
+        AudioType.MP3
+      );
+      this.switchSong(newIndex);
+    } catch (error) {
+      Logger.error(`playNext error: ${error}`);
+    }
+  }
+
+  @Builder
+  MusicInfo() {
+    Column() {
+      Flex({ justifyContent: FlexAlign.SpaceBetween, alignItems: ItemAlign.Center }) {
+        Text(this.songDataList[this.currentSongIndex].title)
+          .fontSize(20)
+          .fontColor(Color.White)
+          .opacity(0.86)
+          .fontWeight(FontWeight.Bold)
+          .fontFamily('HarmonyHeiTi-Bold')
+      }
+
+      Text(this.songDataList[this.currentSongIndex].singer)
+        .textAlign(TextAlign.Start)
+        .fontSize(14)
+        .fontColor('#99FFFFFF')
+        .fontFamily('HarmonyHeiTi')
+        .width('100%')
+        .fontWeight(FontWeight.Regular)
+    }
+    .margin({ top: 24 })
+  }
+
+  getImageColor() {
+    this.getUIContext().getHostContext()!.resourceManager.getMediaContent(this.songDataList[0].label.id)
+      .then((value: Uint8Array) => {
+        let buffer = value.buffer as ArrayBuffer;
+        let imageSource: image.ImageSource = image.createImageSource(buffer);
+        let currentPixelMap: image.PixelMap | undefined = undefined;
+        imageSource.createPixelMap().then((pixelMap) => {
+          effectKit.createColorPicker(pixelMap, (error, colorPicker) => {
+            if (error) {
+              Logger.error(`Failed to create color picker. Error: ${error.code}, message: ${error.message}`);
+            } else {
+              currentPixelMap = pixelMap;
+              let color: effectKit.Color = colorPicker.getLargestProportionColor();
+              let colorArr: number[] = ColorTools.dealColor(color.red, color.green, color.blue);
+              this.imageColor = `rgba(${colorArr[0]}, ${colorArr[1]}, ${colorArr[2]}, 1)`;
+            }
+          })
+          let headFilter = effectKit.createEffect(pixelMap);
+          if (headFilter !== null) {
+            headFilter.blur(15);
+            headFilter.getEffectPixelMap().then((value) => {
+              this.imageLabel = value;
+            })
+          }
+        })
+          .finally(() => {
+            imageSource?.release();
+            currentPixelMap?.release();
+          })
+          .catch((error: BusinessError) => {
+            Logger.error(`createPixelMap error: ${error.code}, message: ${error.message}`);
+          })
+      })
+      .catch((error: BusinessError) => {
+        Logger.error(`getMediaContent error: ${error.code}, message: ${error.message}`);
+      })
+  }
+  
+  /**
+   * æ¢å¤æµè½¬çŠ¶æ€
+   */
+  private async restoreContinuationState(): Promise<void> {
+    try {
+      const context = this.getUIContext().getHostContext();
+      if (!context) return;
+      
+      // æ¢å¤æ’­æ”¾å™¨çŠ¶æ€
+      const restoredTime = await this.playerController.restorePlayerState(context);
+      
+      // å¦‚æžœæœ‰ä¿å­˜çš„æ’­æ”¾è¿›åº¦ï¼Œè·³è½¬åˆ°è¯¥ä½ç½®
+      if (restoredTime > 0) {
+        Logger.info(`æµè½¬åˆ°è®¾å¤‡ï¼Œæ¢å¤åˆ° ${restoredTime}ms`);
+        // å»¶è¿Ÿä¸€ä¸‹å†è·³è½¬ï¼Œç­‰å¾…æ’­æ”¾å™¨åˆå§‹åŒ–å®Œæˆ
+        setTimeout(() => {
+          this.playerController.seek(restoredTime);
+        }, 500);
+      }
+    } catch (error) {
+      Logger.error(`æ¢å¤æµè½¬çŠ¶æ€å¤±è´¥: ${error}`);
+    }
+  }
+}ÀÔrC˜¯@ohos.effectKit¶@ohos.multimedia.image¯../utils/Logger³../common/ConstantsÙ"../components/ControlAreaComponent³../utils/ColorTools¿../components/PlayListComponentº../player/PlayerControllerÔrD—ªassertions¨external¢id¤meta±moduleSideEffectsªresolvedByµsyntheticNamedExportsAÃÙT hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.effectKit.d.tsÔrE‘¯hostModulesInfo‘ÔrF’²hostDependencyName®hostModuleName¯@ohos.effectKit¥entryÃªoh-resolveÂDAÃÙ[ hvigor_ignore_E:_DevEco Studio_sdk_default_openharmony_ets_api_@ohos.multimedia.image.d.tsE’F¶@ohos.multimedia.image¥entryF¶@ohos.multimedia.image¥entryÃªoh-resolveÂDAÂÙAC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\utils\Logger.etsAÃªoh-resolveÂDAÂÙEC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\common\Constants.etsAÃªoh-resolveÂDAÂÙTC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\components\ControlAreaComponent.etsAÃªoh-resolveÂDAÂÙEC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\utils\ColorTools.etsAÃªoh-resolveÂDAÂÙQC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\components\PlayListComponent.etsAÃªoh-resolveÂDAÂÙLC:\Users\Solitary\Desktop\3\3\entry\src\main\ets\player\PlayerController.etsAÃªoh-resolveÂ“ÔrG–§version¤fileªsourceRoot§sources¥names¨mappings¨Index.js ‘©Index.etsÜƒ–”   ” 	” ” ”' .”( /–”   ” 	” ” ”* %”+ &˜”   ” ”	 	” ” ” ”( (”) )˜”   ” ”	 	” ” ”% %”ÌI ÌI”ÌJ ÌJ˜”   ” ”	 	” ” ”" "”ÌC ÌC”ÌD ÌDœ”   ” ”	 	” ” ”   ”" "”+ +”- 7”3 =”ÌH ÌR”ÌI ÌS˜”   ” ”	 	” ” ” ”0 0”1 1˜”   ” ”	 	” ” ”! !”= =”> >’” ” ‘”  ’” %”( 1’”9 ”ÌN 3™”9 +”= /”> 0”ÌJ <”ÌK =”ÌL >”ÌM ?”ÌN Ì@”ÌS ÌE’”?  $”Ì@  %’”= !#”ÌB !(’”ÌE "-”ÌJ "2””  #/”$ #3”4 #ÌC”6 #ÌE‘” >’” 	” ’” 	” ’” 	” ’” 	” ’”  	”  ’”  	”  ’” !	” !’” !	” !’” "” "!’” "” "!’” %” %–” &” &” &	” &” &” &–” '” '” '	”% '!”' '#”( '$’” (” (‘” *’” +” +	–” +” +	” Ìd” Ìd” Ìd” Ìd–” +” +	” Ìe” Ìe
+” Ìe” Ìe˜” +” +	” Ìf”! Ìf”" Ìf”& Ìf”' Ìf”1 Ìf$–” ,” ,” ,” ,” ,”( ,š” ,” ,” -	” -” -” -” -”! -”' -”) - –” ,” ,” .	” .” .” .˜” ,” ,” /	” /” /”$ /”% /”* /!–” ,” ,” 0	” 0” 0” 0’” 2” 2–” 2” 2” ;” ;” ;”  ;–” 2” 2” <” <” <” <•” 2” 2” =” =” =”” >” >” >” >”” ?” ?” ?” ?”” Ì@” Ì@” Ì@” Ì@”” ÌA” ÌA” ÌA” ÌA‘” ÌB–” ÌD” ÌD”  ÌD”+ ÌD ”, ÌD!”4 ÌD)’” ÌE
+” ÌEž” ÌF
+” ÌF” ÌF”  ÌF”) ÌF ”+ ÌF"”7 ÌF.”8 ÌF/”< ÌF3”> ÌF5”ÌF ÌF=”ÌH ÌF?”ÌJ ÌFÌA”ÌL ÌFÌC’” ÌE
+” ÌE—” ÌF
+” ÌF” ÌG”" ÌG”# ÌG”& ÌG”( ÌG–” ÌH” ÌH” ÌH” ÌH” ÌH”  ÌH’” ÌI” ÌI’” ÌE
+” ÌE’” ÌF
+” ÌF’” ÌJ
+” ÌJž” ÌK
+” ÌK” ÌK”  ÌK”) ÌK ”+ ÌK"”7 ÌK.”8 ÌK/”= ÌK4”? ÌK6”ÌG ÌK>”ÌI ÌKÌ@”ÌK ÌKÌB”ÌM ÌKÌD’” ÌJ
+” ÌJ—” ÌK
+” ÌK” ÌL”" ÌL”# ÌL”& ÌL”( ÌL–” ÌM” ÌM” ÌM”! ÌM”# ÌM!”$ ÌM"’” ÌN” ÌN’” ÌJ
+” ÌJ’” ÌK
+” ÌK’” ÌD” ÌD•” 3” 3” 3” 3”# 3•” 4” 4” 4” 4”# 4’” 5” 5’” 5” 5“”, 6”Ì@ 6”ÌG 6›” 7
+”  7”" 7”& 7”' 7”3 7%”4 7&”8 7*”9 7+”ÌI 7;”ÌJ 7<–” 8
+”" 8”$ 8”( 8”) 8”3 8%‘” 9	›” 7
+”$ 7”& 7”* 7”+ 7”7 7%”8 7&”< 7*”= 7+”ÌM 7;”ÌN 7<–” 8
+”& 8”( 8”, 8”- 8”7 8%›” 7
+”  7”" 7”& 7”' 7”3 7%”4 7&”8 7*”9 7+”ÌI 7;”ÌJ 7<–” 8
+”" 8”$ 8”( 8”) 8”3 8%’” 2” 2’” ÌR” ÌR–” ÌS” ÌS
+” ÌS” ÌS”# ÌS”% ÌS“”+ Ì_”4 Ì_”5 Ì_”” Ì`”$ Ì`”& Ì`”) Ì`‘” Ìaœ”# Ì]”+ Ì]”, Ì]”. Ì]”/ Ì]”1 Ì]”2 Ì]”4 Ì]”5 Ì]”7 Ì]”= Ì]%”? Ì]'Ü ”# Ì^”, Ì^”- Ì^”/ Ì^”0 Ì^”2 Ì^”6 Ì^”7 Ì^”ÌE Ì^-”ÌF Ì^.”ÌG Ì^/”ÌH Ì^0”ÌO Ì^7”ÌP Ì^8”ÌQ Ì^9”ÌR Ì^:”ÌV Ì^>”ÌX Ì^Ì@’”+ Ì_”4 Ì_“”8 ÌT”ÌI ÌT”ÌP ÌT–”$ ÌU
+”, ÌU”. ÌU”2 ÌU”3 ÌU”? ÌU%–”$ ÌV
+”0 ÌV”2 ÌV”6 ÌV”7 ÌV”ÌG ÌV-™”$ ÌW
+”, ÌW”. ÌW”2 ÌW”3 ÌW”ÌC ÌW)”ÌD ÌW*”ÌO ÌW5”ÌQ ÌW7–”$ ÌX
+”. ÌX”0 ÌX”4 ÌX”5 ÌX”? ÌX%—”$ ÌY
+”0 ÌY”2 ÌY”3 ÌY”8 ÌY&”: ÌY(”< ÌY*˜”( ÌZ”, ÌZ”- ÌZ”7 ÌZ”8 ÌZ”= ÌZ!”> ÌZ"”? ÌZ#’”$ Ì[
+”% Ì[‘”! Ì\	–”( ÌU
+”0 ÌU”2 ÌU”6 ÌU”7 ÌU”ÌC ÌU%–”( ÌV
+”4 ÌV”6 ÌV”: ÌV”; ÌV”ÌK ÌV-™”( ÌW
+”0 ÌW”2 ÌW”6 ÌW”7 ÌW”ÌG ÌW)”ÌH ÌW*”ÌS ÌW5”ÌU ÌW7–”( ÌX
+”2 ÌX”4 ÌX”8 ÌX”9 ÌX”ÌC ÌX%—”( ÌY
+”4 ÌY”6 ÌY”7 ÌY”< ÌY&”> ÌY(”Ì@ ÌY*˜”, ÌZ”0 ÌZ”1 ÌZ”; ÌZ”< ÌZ”ÌA ÌZ!”ÌB ÌZ"”ÌC ÌZ#’”( Ì[
+”) Ì[–”$ ÌU
+”, ÌU”. ÌU”2 ÌU”3 ÌU”? ÌU%–”$ ÌV
+”0 ÌV”2 ÌV”6 ÌV”7 ÌV”ÌG ÌV-™”$ ÌW
+”, ÌW”. ÌW”2 ÌW”3 ÌW”ÌC ÌW)”ÌD ÌW*”ÌO ÌW5”ÌQ ÌW7–”$ ÌX
+”. ÌX”0 ÌX”4 ÌX”5 ÌX”? ÌX%‘” Ìb‘” Ìb’” +” +	‘” Ìg’” Ìj” Ìj’” Ìk” Ìk–” Ìk” Ìk” Ìx” Ìx” Ìx” Ìx” Ìl” Ìl” Ìl” Ìl” Ìl”* Ìl”+ Ìl”/ Ìl"”0 Ìl#”Ì@ Ìl3”ÌA Ìl4”ÌB Ìl5”ÌG Ìl:–” Ìl” Ìl” Ìm	” Ìm” Ìm” Ìm–” Ìl” Ìl” Ìn	” Ìn” Ìn” Ìn–” Ìl” Ìl” Ìo	” Ìo” Ìo”  Ìo•” Ìl” Ìl” Ìp	” Ìp” Ìp”” Ìq
+” Ìq” Ìq” Ìq”” Ìr
+” Ìr” Ìr”" Ìr”” Ìs
+” Ìs” Ìs” Ìs”” Ìt
+” Ìt” Ìt” Ìt‘” Ìu	–” Ìl” Ìl” Ìv	” Ìv” Ìv” Ìv’” Ìk” Ìk‘” Ìy’” Ì{” Ì{	”” Ì|
+” Ì|” Ì|” Ì|"—” Ì}” Ì}” Ì}	” Ì}”  Ì}”% Ì}!”& Ì}"–” Ì~” Ì~” Ì~	” Ì~” Ì~” Ì~’” Ì€” Ì€›” Ì” Ì
+” Ì” Ì” Ì” Ì”& Ì"”' Ì#”, Ì(”- Ì)”. Ì*Ü ” Ì‚” Ì‚” Ì‚	” Ì‚” Ì‚” Ì‚”* Ì‚&”, Ì‚(”. Ì‚*”= Ì‚9”> Ì‚:”ÌF Ì‚ÌB”ÌG Ì‚ÌC”ÌK Ì‚ÌG”ÌL Ì‚ÌH”ÌO Ì‚ÌK”ÌR Ì‚ÌN”Ì[ Ì‚ÌW”Ì\ Ì‚ÌX”Ì_ Ì‚Ì[”Ì` Ì‚Ì\—” Ìƒ” Ìƒ” Ìƒ” Ìƒ”$ Ìƒ”& Ìƒ ”( Ìƒ"Ü ” Ì„” Ì„” Ì„”! Ì„”" Ì„”, Ì„(”- Ì„)”2 Ì„.”4 Ì„0”ÌE Ì„ÌA”ÌG Ì„ÌC”ÌP Ì„ÌL”ÌQ Ì„ÌM”ÌT Ì„ÌP”ÌU Ì„ÌQ”ÌV Ì„ÌR“” Ì…”	 Ì…”
+ Ì…—” Ì†” Ì†” Ì†” Ì†” Ì†"” Ì†$” Ì†&Ü ” Ì‡” Ì‡” Ì‡” Ì‡” Ì‡”/ Ì‡+”4 Ì‡0”5 Ì‡1”9 Ì‡5”ÌG Ì‡ÌC”ÌL Ì‡ÌH”ÌM Ì‡ÌI”ÌT Ì‡ÌP”ÌV Ì‡ÌR”ÌW Ì‡ÌS”ÌX Ì‡ÌT”” Ìˆ”	 Ìˆ”
+ Ìˆ” Ìˆ	’” Ì‰” Ì‰’” Ì‹”
+ Ì‹’” ÌŒ
+” ÌŒ’” Ì” Ì›” ÌŽ” ÌŽ” ÌŽ”! ÌŽ”% ÌŽ”& ÌŽ ”6 ÌŽ0”7 ÌŽ1”ÌF ÌŽÌ@”ÌH ÌŽÌB”ÌI ÌŽÌCÜ )” Ì” Ì” Ì” Ì”! Ì”" Ì”2 Ì,”3 Ì-”? Ì9”Ì@ Ì”ÌD Ì”ÌE Ì”ÌQ Ì”ÌS Ì”ÌT Ì”Ìb Ì*”Ìd Ì-”Ìe Ì.”Ìt Ì=”Ìu Ì>”Ì ÌÌJ”Ì‚ Ì‘
+”Ì† Ì‘”Ì‡ Ì‘”Ì“ Ì‘”Ì” Ì‘”Ì  Ì‘(”Ì¡ Ì‘)”Ì¢ Ì‘*”Ì¥ Ì‘-”Ì¨ Ì‘0”Ì± Ì‘9”Ì² Ì‘:”Ìµ Ì‘=”Ì¶ Ì’	”Ì¸ Ì“”ÌÁ Ì“”ÌÂ Ì“”ÌÅ Ì“”ÌÆ Ì””ÌÇ Ì”˜” Ì•” Ì•
+” Ì•” Ì•” Ì•”$ Ì•”% Ì•”& Ì• ‘”	 Ì–”” Ì–” Ì–” Ì–” Ì–š” Ì—” Ì—” Ì—” Ì—” Ì—”0 Ì—*”5 Ì—/”7 Ì—1”8 Ì—2”9 Ì—3‘”	 Ì˜’” Ì™” Ì™’” Ì›”
+ Ì›’” Ìœ
+” Ìœ’” Ì” Ì›” Ìž” Ìž” Ìž”! Ìž”% Ìž”& Ìž ”6 Ìž0”7 Ìž1”ÌF ÌžÌ@”ÌH ÌžÌB”ÌI ÌžÌCÜ )” ÌŸ” ÌŸ” ÌŸ” ÌŸ”! ÌŸ”" ÌŸ”2 ÌŸ,”3 ÌŸ-”; ÌŸ5”< Ì ”Ì@ Ì ”ÌA Ì ”ÌM Ì ”ÌO Ì ”ÌP Ì ”Ì^ Ì *”Ì` Ì -”Ìa Ì .”Ìp Ì =”Ìq Ì >”Ì} Ì ÌJ”Ì~ Ì¡
+”Ì‚ Ì¡”Ìƒ Ì¡”Ì Ì¡”Ì Ì¡”Ìœ Ì¡(”Ì Ì¡)”Ìž Ì¡*”Ì¡ Ì¡-”Ì¤ Ì¡0”Ì­ Ì¡9”Ì® Ì¡:”Ì± Ì¡=”Ì² Ì¢	”Ì´ Ì£”Ì½ Ì£”Ì¾ Ì£”ÌÁ Ì£”ÌÂ Ì¤”ÌÃ Ì¤˜” Ì¥” Ì¥
+” Ì¥” Ì¥” Ì¥”$ Ì¥”% Ì¥”& Ì¥ ‘”	 Ì¦”” Ì¦” Ì¦” Ì¦” Ì¦š” Ì§” Ì§” Ì§” Ì§” Ì§”, Ì§&”1 Ì§+”3 Ì§-”4 Ì§.”5 Ì§/‘”	 Ì¨’” Ì©” Ì©’” Ì¬” Ì¬’” Ì­” Ì­
+š” Ì­” Ì­
+” Ì¿” Ì¿” Ì¿” Ì¿” Ì¿”! Ì¿”# Ì¿”% Ì¿Ü ” Ì®” Ì®
+” Ì®” Ì®”( Ì®”* Ì®”3 Ì®&”4 Ì®'”Ì@ Ì®3”ÌB Ì®5”ÌL Ì®?”ÌN Ì®ÌA”ÌW Ì®ÌJ”ÌX Ì®ÌK”Ì^ Ì®ÌQ”Ì` Ì®ÌS” Ì¯” Ì¯” Ì¯” Ì¯” Ì¯”) Ì¯”* Ì¯”. Ì¯#”/ Ì¯$”? Ì¯4”Ì@ Ì¯5”ÌA Ì¯6”ÌF Ì¯;–” Ì¯” Ì¯” Ì°” Ì°” Ì°” Ì°˜” Ì¯” Ì¯” Ì±” Ì±” Ì±”  Ì±”! Ì±”& Ì± –” Ì¯” Ì¯” Ì²” Ì²” Ì²” Ì²˜” Ì¯” Ì¯” Ì³” Ì³” Ì³”& Ì³ ”' Ì³!”+ Ì³%–” Ì¯” Ì¯” Ì´” Ì´” Ì´”/ Ì´)’” Ì¯” Ì¯’” Ì®” Ì®
+” Ì·” Ì·
+” Ì·” Ì·” Ì·”) Ì·”* Ì·”. Ì·!”/ Ì·"”? Ì·2”Ì@ Ì·3”ÌA Ì·4”ÌG Ì·:˜” Ì·” Ì·
+” Ì¸	” Ì¸” Ì¸”$ Ì¸”% Ì¸”* Ì¸"–” Ì·” Ì·
+” Ì¹	” Ì¹” Ì¹” Ì¹–” Ì·” Ì·
+” Ìº	” Ìº” Ìº”& Ìº–” Ì·” Ì·
+” Ì»	” Ì»” Ì»”* Ì»"–” Ì·” Ì·
+” Ì¼	” Ì¼” Ì¼” Ì¼˜” Ì·” Ì·
+” Ì½	” Ì½” Ì½”& Ì½”' Ì½”. Ì½&’” Ì·” Ì·
+’” Ì­” Ì­
+‘” ÌÀ’” ÌÂ” ÌÂÜ ” ÌÃ” ÌÃ” ÌÃ	” ÌÃ” ÌÃ” ÌÃ”* ÌÃ&”, ÌÃ)”- ÌÃ*”< ÌÃ9”= ÌÃ:”ÌL ÌÃÌI”ÌM ÌÃÌJ”ÌQ ÌÃÌN”ÌR ÌÃÌO”Ì^ ÌÃÌ[”Ì_ ÌÃÌ\”Ì` ÌÃÌ]”Ìa ÌÃÌ^”Ìb ÌÃÌ_”Ìg ÌÃÌd”Ìh ÌÃÌe”Ìj ÌÃÌg”Ìk ÌÃÌh—” ÌÄ” ÌÄ” ÌÄ” ÌÄ” ÌÄ” ÌÄ ” ÌÄ"˜” ÌÅ” ÌÅ” ÌÅ” ÌÅ” ÌÅ” ÌÅ”% ÌÅ0”& ÌÅ1›” ÌÆ” ÌÆ” ÌÆ” ÌÆ-”# ÌÆ2”$ ÌÆ3”5 ÌÆÌD”6 ÌÆÌE”< ÌÆÌK”= ÌÆÌL”> ÌÆÌM–” ÌÇ” ÌÇ” ÌÇ”" ÌÇ:”+ ÌÇÌC”, ÌÇÌDœ” ÌÈ” ÌÈ” ÌÈ”& ÌÈ"”( ÌÈ$”) ÌÈ%”- ÌÈ)”. ÌÈ*”/ ÌÈ+”7 ÌÈ3”9 ÌÈ5”; ÌÈ7” ÌÉ
+” ÌÉ” ÌÉ”+ ÌÉ%”, ÌÉ&”4 ÌÉ.”6 ÌÉ0”7 ÌÉ1”< ÌÉ6”> ÌÉ8”ÌI ÌÉÌC”ÌK ÌÉÌE”ÌM ÌÉÌG”” ÌÊ” ÌÊ” ÌÊ” ÌÊÜ ” ÌË” ÌË” ÌË”$ ÌË”% ÌË”ÌN ÌËÌD”ÌS ÌËÌI”ÌT ÌËÌJ”ÌX ÌËÌN”Ìf ÌËÌ\”Ìk ÌËÌa”Ìl ÌËÌb”Ìs ÌËÌi”Ìu ÌËÌk”Ìv ÌËÌl”Ìw ÌËÌm‘” ÌÌ‘” ÌÌ•” ÌÍ”' ÌÍ”* ÌÍ ”2 ÌÍ(”3 ÌÍ)™” ÌÎ” ÌÎ”! ÌÎ”$ ÌÎ+”/ ÌÎ6”0 ÌÎ7”ÌI ÌÎÌP”ÌK ÌÎÌR”ÌL ÌÎÌSÜ ” ÌÏ” ÌÏ”$ ÌÏ”' ÌÏ'”1 ÌÏ1”2 ÌÏ2”; ÌÏ;”< ÌÏ<”ÌA ÌÏÌA”ÌB ÌÏÌB”ÌE ÌÏÌE”ÌG ÌÏÌG”ÌL ÌÏÌL”ÌM ÌÏÌM”ÌR ÌÏÌR”ÌT ÌÏÌT”ÌY ÌÏÌY”ÌZ ÌÏÌZ”Ì^ ÌÏÌ^”Ì_ ÌÏÌ_”Ì` ÌÏÌ`Ü ” ÌÐ” ÌÐ” ÌÐ”' ÌÐ”* ÌÐ ”2 ÌÐ(”: ÌÐ0”; ÌÐ1”< ÌÐ2”= ÌÐ3”ÌB ÌÐ8”ÌJ ÌÐÌ@”ÌK ÌÐÌA”ÌL ÌÐÌB”ÌM ÌÐÌC”ÌR ÌÐÌH”ÌZ ÌÐÌP”Ì[ ÌÐÌQ”Ì\ ÌÐÌR”Ì] ÌÐÌS”Ìc ÌÐÌY”Ìd ÌÐÌZ‘” ÌÑ”” ÌÒ
+” ÌÒ” ÌÒ” ÌÒ›” ÌÓ
+” ÌÓ” ÌÓ”! ÌÓ”* ÌÓ$”+ ÌÓ%”7 ÌÓ1”8 ÌÓ2”Ì@ ÌÓ:”ÌA ÌÓ;”ÌB ÌÓ<–” ÌÔ
+” ÌÔ” ÌÔ”# ÌÔ”' ÌÔ!”) ÌÔ#˜” ÌÕ” ÌÕ” ÌÕ”# ÌÕ”$ ÌÕ”& ÌÕ”' ÌÕ”( ÌÕ œ” ÌÖ” ÌÖ” ÌÖ”0 ÌÖ(”2 ÌÖ*”3 ÌÖ+”7 ÌÖ/”8 ÌÖ0”9 ÌÖ1”> ÌÖ6”Ì@ ÌÖ8”ÌB ÌÖ:—” Ì×” Ì×” Ì×”' Ì×”* Ì× ”/ Ì×%”0 Ì×&”” ÌØ” ÌØ” ÌØ” ÌØ‘” ÌÙ“” ÌÚ” ÌÚ	” ÌÚ
+•” ÌÛ” ÌÛ” ÌÛ” ÌÛ” ÌÛ–” ÌÜ” ÌÜ” ÌÜ”$ ÌÜ ”& ÌÜ"”' ÌÜ#–” ÌÝ” ÌÝ”! ÌÝ”( ÌÝ$”* ÌÝ&”+ ÌÝ'“” ÌÞ
+” ÌÞ” ÌÞ—” Ìß” Ìß” Ìß” Ìß” Ìß&” Ìß(”! Ìß*Ü ” Ìà” Ìà” Ìà” Ìà” Ìà”6 Ìà2”; Ìà7”< Ìà8”Ì@ Ìà<”ÌN ÌàÌJ”ÌS ÌàÌO”ÌT ÌàÌP”Ì[ ÌàÌW”Ì] ÌàÌY”Ì^ ÌàÌZ”Ì_ ÌàÌ[”” Ìá
+” Ìá” Ìá” Ìá“” Ìâ”	 Ìâ”
+ Ìâ—” Ìã” Ìã” Ìã” Ìã” Ìã"” Ìã$” Ìã&Ü ” Ìä” Ìä” Ìä” Ìä” Ìä”3 Ìä/”8 Ìä4”9 Ìä5”= Ìä9”ÌK ÌäÌG”ÌP ÌäÌL”ÌQ ÌäÌM”ÌX ÌäÌT”ÌZ ÌäÌV”Ì[ ÌäÌW”Ì\ ÌäÌX”” Ìå”	 Ìå”
+ Ìå” Ìå’” Ìæ” Ìæ‘” Ìè‘” Ìê”” Ìë
+”	 Ìë”
+ Ìë”" Ìë(’” Ìì” Ììœ” Ìí” Ìí” Ìí” Ìí”  Ìí”! Ìí”- Ìí'”/ Ìí)”0 Ìí*”> Ìí8”Ì@ Ìí:”ÌA Ìí;”” Ìî” Ìî
+” Ìî” Ìî’” Ìî” Ìî’” Ìð” Ìðž” Ìñ” Ìñ” Ìñ”! Ìñ”' Ìñ!”+ Ìñ%”, Ìñ&”< Ìñ6”= Ìñ7”ÌO ÌñÌI”ÌP ÌñÌJ”ÌW ÌñÌQ”ÌX ÌñÌR”ÌY ÌñÌS’” Ìó”  Ìó–” Ìô” Ìô
+” Ìô” Ìô”  Ìô”" Ìôš” Ìõ” Ìõ” Ìõ” Ìõ” Ìõ”) Ìõ!”5 Ìõ-”9 Ìõ1”: Ìõ2”; Ìõ3’” Ìö”% Ìö•” Ì÷” Ì÷” Ì÷” Ì÷”  Ì÷š” Ìø
+” Ìø” Ìø”) Ìø”* Ìø ”. Ìø$”/ Ìø%”; Ìø1”< Ìø2”= Ìø3–” Ìù” Ìù	” Ìù” Ìù” Ìù” Ìù‘” Ìú‘”	 Ìû”” Ìû” Ìû” Ìû” Ìûš” Ìü” Ìü” Ìü” Ìü” Ìü”& Ìü ”+ Ìü%”- Ìü'”. Ìü(”/ Ìü)‘”	 Ìý’” Ìþ” ÌþÔrH–§version¤file§sources®sourcesContent¥names¨mappingsÀ‘À‘ÀÜŒ‘”    ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”  	 ‘”  
+ ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”   ‘”    ‘”  ! ‘”  " ‘”  # ‘”  $ ‘”  % ‘”  & ‘”  ' ‘”  ( ‘”  ) ‘”  * ‘”  + ‘”  , ‘”  - ‘”  . ‘”  / ‘”  0 ‘”  1 ‘”  2 ‘”  3 ‘”  4 ‘”  5 ‘”  6 ‘”  7 ‘”  8 ‘”  9 ‘”  : ‘”  ; ‘”  < ‘”  = ‘”  > ‘”  ? ‘”  Ì@ ‘”  ÌA ‘”  ÌB ‘”  ÌC ‘”  ÌD ‘”  ÌE ‘”  ÌF ‘”  ÌG ‘”  ÌH ‘”  ÌI ‘”  ÌJ ‘”  ÌK ‘”  ÌL ‘”  ÌM ‘”  ÌN ‘”  ÌO ‘”  ÌP ‘”  ÌQ ‘”  ÌR ‘”  ÌS ‘”  ÌT ‘”  ÌU ‘”  ÌV ‘”  ÌW ‘”  ÌX ‘”  ÌY ‘”  ÌZ ‘”  Ì[ ‘”  Ì\ ‘”  Ì] ‘”  Ì^ ‘”  Ì_ ‘”  Ì` ‘”  Ìa ‘”  Ìb ‘”  Ìc ‘”  Ìd ‘”  Ìe ‘”  Ìf ‘”  Ìg ‘”  Ìh ‘”  Ìi ‘”  Ìj ‘”  Ìk ‘”  Ìl ‘”  Ìm ‘”  Ìn ‘”  Ìo ‘”  Ìp ‘”  Ìq ‘”  Ìr ‘”  Ìs ‘”  Ìt ‘”  Ìu ‘”  Ìv ‘”  Ìw ‘”  Ìx ‘”  Ìy ‘”  Ìz ‘”  Ì{ ‘”  Ì| ‘”  Ì} ‘”  Ì~ ‘”  Ì ‘”  Ì€ ‘”  Ì ‘”  Ì‚ ‘”  Ìƒ ‘”  Ì„ ‘”  Ì… ‘”  Ì† ‘”  Ì‡ ‘”  Ìˆ ‘”  Ì‰ ‘”  ÌŠ ‘”  Ì‹ ‘”  ÌŒ ‘”  Ì ‘”  ÌŽ ‘”  Ì ‘”  Ì ‘”  Ì‘ ‘”  Ì’ ‘”  Ì“ ‘”  Ì” ‘”  Ì• ‘”  Ì– ‘”  Ì— ‘”  Ì˜ ‘”  Ì™ ‘”  Ìš ‘”  Ì› ‘”  Ìœ ‘”  Ì ‘”  Ìž ‘”  ÌŸ ‘”  Ì  ‘”  Ì¡ ‘”  Ì¢ ‘”  Ì£ ‘”  Ì¤ ‘”  Ì¥ ‘”  Ì¦ ‘”  Ì§ ‘”  Ì¨ ‘”  Ì© ‘”  Ìª ‘”  Ì« ‘”  Ì¬ ‘”  Ì­ ‘”  Ì® ‘”  Ì¯ ‘”  Ì° ‘”  Ì± ‘”  Ì² ‘”  Ì³ ‘”  Ì´ ‘”  Ìµ ‘”  Ì¶ ‘”  Ì· ‘”  Ì¸ ‘”  Ì¹ ‘”  Ìº ‘”  Ì» ‘”  Ì¼ ‘”  Ì½ ‘”  Ì¾ ‘”  Ì¿ ‘”  ÌÀ ‘”  ÌÁ ‘”  ÌÂ ‘”  ÌÃ ‘”  ÌÄ ‘”  ÌÅ ‘”  ÌÆ ‘”  ÌÇ ‘”  ÌÈ ‘”  ÌÉ ‘”  ÌÊ ‘”  ÌË ‘”  ÌÌ ‘”  ÌÍ ‘”  ÌÎ ‘”  ÌÏ ‘”  ÌÐ ‘”  ÌÑ ‘”  ÌÒ ‘”  ÌÓ ‘”  ÌÔ ‘”  ÌÕ ‘”  ÌÖ ‘”  Ì× ‘”  ÌØ ‘”  ÌÙ ‘”  ÌÚ ‘”  ÌÛ ‘”  ÌÜ ‘”  ÌÝ ‘”  ÌÞ ‘”  Ìß ‘”  Ìà ‘”  Ìá ‘”  Ìâ ‘”  Ìã ‘”  Ìä ‘”  Ìå ‘”  Ìæ ‘”  Ìç ‘”  Ìè ‘”  Ìé ‘”  Ìê ‘”  Ìë ‘”  Ìì ‘”  Ìí ‘”  Ìî ‘”  Ìï ‘”  Ìð ‘”  Ìñ ‘”  Ìò ‘”  Ìó ‘”  Ìô ‘”  Ìõ ‘”  Ìö ‘”  Ì÷ ‘”  Ìø ‘”  Ìù ‘”  Ìú ‘”  Ìû ‘”  Ìü ‘”  Ìý ‘”  Ìþ ‘”  Ìÿ ‘”  Í  ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í	 ‘”  Í
+ ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í ‘”  Í  ‘”  Í! ‘”  Í" ‘”  Í# ‘”  Í$ ‘”  Í% ‘”  Í& ‘”  Í' ‘”  Í( ‘”  Í) ‘”  Í* ‘”  Í+ ‘”  Í, ‘”  Í- ‘”  Í. ‘”  Í/ ‘”  Í0 ‘”  Í1 ‘”  Í2 ‘”  Í3 ‘”  Í4 ‘”  Í5 ‘”  Í6 ‘”  Í7 ‘”  Í8 ‘”  Í9 ‘”  Í: ‘”  Í; ‘”  Í< ‘”  Í= ‘”  Í> ‘”  Í? ‘”  Í@ ‘”  ÍA ‘”  ÍB ‘”  ÍC ‘”  ÍD ‘”  ÍE ‘”  ÍF ‘”  ÍG ‘”  ÍH ‘”  ÍI ‘”  ÍJ ‘”  ÍK ‘”  ÍL ‘”  ÍM ‘”  ÍN ‘”  ÍO ‘”  ÍP ‘”  ÍQ ‘”  ÍR ‘”  ÍS ‘”  ÍT ‘”  ÍU ‘”  ÍV ‘”  ÍW ‘”  ÍX ‘”  ÍY ‘”  ÍZ ‘”  Í[ ‘”  Í\ ‘”  Í] ‘”  Í^ ‘”  Í_ ‘”  Í` ‘”  Ía ‘”  Íb ‘”  Íc ‘”  Íd ‘”  Íe ‘”  Íf ‘”  Íg ‘”  Íh ‘”  Íi ‘”  Íj ‘”  Ík ‘”  Íl ‘”  Ím ‘”  Ín ‘”  Ío ‘”  Íp ‘”  Íq ‘”  Ír ‘”  Ís ‘”  Ít ‘”  Íu ‘”  Ív ‘”  Íw ‘”  Íx ‘”  Íy ‘”  Íz ‘”  Í{ ‘”  Í| ‘”  Í} ‘”  Í~ ‘”  Í ‘”  Í€ ‘”  Í ‘”  Í‚ ‘”  Íƒ ‘”  Í„ ‘”  Í… ‘”  Í† ‘”  Í‡ ‘”  Íˆ ‘”  Í‰ ‘”  ÍŠ ‘”  Í‹ ÔrI’§missing¦pluginÃ¦genAbcÂÔ  ÔrJ”²dynamicImportCache¹exportAllDeclarationCache»exportNamedDeclarationCache«importCache˜ÔrK•¤type¥start£endªspecifiers¦source±ImportDeclarationÌ€Ì¨‘ÔrL”¤type¥start£end¥local¶ImportDefaultSpecifierÌ‡ÌÔrM”¤type¥start£end¤nameªIdentifierÌ‡Ì©effectKitÔrN•¤type¥start£end¥value£raw§LiteralÌ–Ì§¯@ohos.effectKit±"@ohos.effectKit"K±ImportDeclarationÌªÌÕ‘L¶ImportDefaultSpecifierÌ±Ì¶MªIdentifierÌ±Ì¶¥imageN§LiteralÌ¼ÌÔ¶@ohos.multimedia.image¸"@ohos.multimedia.image"K±ImportDeclarationÌ×Í ‘ÔrO•¤type¥start£end¨imported¥local¯ImportSpecifierÌàÌæMªIdentifierÌàÌæ¦LoggerMªIdentifierÌàÌæ¦LoggerN§LiteralÌîÌÿ¯../utils/Logger±'../utils/Logger'K±ImportDeclarationÍÍL‘O¯ImportSpecifierÍÍMªIdentifierÍÍ´ControlAreaComponentMªIdentifierÍÍ´ControlAreaComponentN§LiteralÍ'ÍKÙ"../components/ControlAreaComponentÙ$'../components/ControlAreaComponent'K±ImportDeclarationÍNÍ’‘O¯ImportSpecifierÍWÍhMªIdentifierÍWÍh±PlayListComponentMªIdentifierÍWÍh±PlayListComponentN§LiteralÍpÍ‘¿../components/PlayListComponentÙ!'../components/PlayListComponent'K±ImportDeclarationÍ”ÍÝ“O¯ImportSpecifierÍÍ©MªIdentifierÍÍ©¬songDataListMªIdentifierÍÍ©¬songDataListO¯ImportSpecifierÍ«Í´MªIdentifierÍ«Í´©AudioNameMªIdentifierÍ«Í´©AudioNameO¯ImportSpecifierÍ¶Í¿MªIdentifierÍ¶Í¿©AudioTypeMªIdentifierÍ¶Í¿©AudioTypeN§LiteralÍÇÍÜ³../common/Constantsµ'../common/Constants'K±ImportDeclarationÍßÍ‘O¯ImportSpecifierÍèÍòMªIdentifierÍèÍòªColorToolsMªIdentifierÍèÍòªColorToolsN§LiteralÍúÍ³../utils/ColorToolsµ'../utils/ColorTools'K±ImportDeclarationÍÍP‘O¯ImportSpecifierÍÍ+MªIdentifierÍÍ+°PlayerControllerMªIdentifierÍÍ+°PlayerControllerN§LiteralÍ3ÍOº../player/PlayerController¼'../player/PlayerController'
